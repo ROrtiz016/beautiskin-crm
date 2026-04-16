@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\AppointmentService;
+use App\Models\ClinicSetting;
 use App\Models\Customer;
 use App\Models\Service;
-use App\Models\User;
+use App\Services\AppointmentPolicyEnforcer;
+use App\Support\AppointmentFormLookupCache;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +17,10 @@ use Illuminate\View\View;
 
 class CustomerWebController extends Controller
 {
+    private const CUSTOMER_PROFILE_APPOINTMENTS_LIMIT = 250;
+
+    private const CUSTOMER_PAYMENT_HISTORY_LIMIT = 120;
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('search', ''));
@@ -142,14 +148,23 @@ class CustomerWebController extends Controller
     {
         $customer->load([
             'appointments' => function ($query) {
-                $query->with(['services', 'staffUser'])->latest('scheduled_at');
+                $query->with(['services', 'staffUser'])
+                    ->latest('scheduled_at')
+                    ->limit(self::CUSTOMER_PROFILE_APPOINTMENTS_LIMIT);
             },
             'memberships.membership',
         ]);
 
-        $paymentHistory = $customer->appointments()
+        $totalSpent = (float) Appointment::query()
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->sum('total_amount');
+
+        $paymentHistory = Appointment::query()
+            ->where('customer_id', $customer->id)
             ->where('status', 'completed')
             ->latest('scheduled_at')
+            ->limit(self::CUSTOMER_PAYMENT_HISTORY_LIMIT)
             ->get(['id', 'scheduled_at', 'status', 'total_amount', 'notes']);
 
         $servicesReceived = AppointmentService::query()
@@ -211,19 +226,22 @@ class CustomerWebController extends Controller
             'servicesReceived' => $servicesReceived,
             'currentMemberships' => $currentMemberships,
             'pastMemberships' => $pastMemberships,
-            'totalSpent' => $paymentHistory->sum('total_amount'),
+            'totalSpent' => $totalSpent,
+            'paymentHistoryDisplayLimit' => self::CUSTOMER_PAYMENT_HISTORY_LIMIT,
+            'appointmentsProfileDisplayLimit' => self::CUSTOMER_PROFILE_APPOINTMENTS_LIMIT,
             'nextAppointment' => $nextAppointment,
             'bookedAppointments' => $bookedAppointments,
             'pastAppointments' => $pastAppointments,
             'recentlyChangedAppointmentIds' => $recentlyChangedAppointmentIds,
-            'services' => Service::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'price']),
-            'staffUsers' => User::query()->orderBy('name')->get(['id', 'name']),
+            'services' => AppointmentFormLookupCache::activeServices(),
+            'staffUsers' => AppointmentFormLookupCache::staffUsers(),
+            'clinicSettings' => ClinicSetting::current(),
         ]);
     }
 
     public function storeAppointment(Request $request, Customer $customer): RedirectResponse
     {
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'scheduled_at' => ['required', 'date'],
             'ends_at' => ['nullable', 'date', 'after:scheduled_at'],
             'staff_user_id' => ['nullable', 'exists:users,id'],
@@ -231,7 +249,13 @@ class CustomerWebController extends Controller
             'services' => ['array'],
             'services.*.service_id' => ['nullable', 'exists:services,id'],
             'services.*.quantity' => ['nullable', 'integer', 'min:1'],
-        ]);
+        ], AppointmentPolicyEnforcer::depositRulesForRequest()));
+
+        $dateKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
+        AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded($dateKey);
+
+        $depositPaid = AppointmentPolicyEnforcer::depositPaidFromValidated($validated);
+        $depositAmount = $depositPaid ? AppointmentPolicyEnforcer::defaultDepositAmount() : null;
 
         $appointment = Appointment::query()->create([
             'customer_id' => $customer->id,
@@ -242,6 +266,8 @@ class CustomerWebController extends Controller
             'arrived_confirmed' => false,
             'notes' => $validated['notes'] ?? null,
             'total_amount' => number_format(0, 2, '.', ''),
+            'deposit_amount' => $depositAmount,
+            'deposit_paid' => $depositPaid,
         ]);
 
         $this->syncAppointmentServices($appointment, $validated['services'] ?? []);
@@ -260,6 +286,10 @@ class CustomerWebController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['booked', 'completed', 'cancelled'])],
         ]);
+
+        if ($validated['status'] === 'cancelled' && $appointment->status !== 'cancelled') {
+            AppointmentPolicyEnforcer::assertCanMarkCancelled($appointment);
+        }
 
         $appointment->update([
             'status' => $validated['status'],
@@ -285,6 +315,12 @@ class CustomerWebController extends Controller
             'services.*.service_id' => ['nullable', 'exists:services,id'],
             'services.*.quantity' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        $newDateKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
+        $oldDateKey = AppointmentPolicyEnforcer::appointmentDateKey($appointment->scheduled_at);
+        if ($newDateKey !== $oldDateKey) {
+            AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded($newDateKey, $appointment->id);
+        }
 
         $appointment->update([
             'scheduled_at' => $validated['scheduled_at'],

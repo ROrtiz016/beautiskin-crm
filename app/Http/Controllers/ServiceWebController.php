@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Membership;
 use App\Models\Service;
-use App\Models\User;
+use App\Support\AppointmentFormLookupCache;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,18 +17,20 @@ class ServiceWebController extends Controller
         $search = trim((string) $request->query('search', ''));
 
         $services = Service::query()
-            ->with('staffUsers')
+            ->with(['staffUsers', 'coveredByMemberships'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%");
             })
             ->orderBy('name')
             ->get();
 
-        $staffUsers = User::query()->orderBy('name')->get(['id', 'name']);
+        $staffUsers = AppointmentFormLookupCache::staffUsers();
+        $memberships = Membership::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         return view('services.index', [
             'services' => $services,
             'staffUsers' => $staffUsers,
+            'memberships' => $memberships,
             'search' => $search,
         ]);
     }
@@ -38,6 +41,7 @@ class ServiceWebController extends Controller
 
         $service = Service::query()->create($validated['attributes']);
         $service->staffUsers()->sync($validated['staff_user_ids']);
+        $service->coveredByMemberships()->sync($validated['membership_ids']);
 
         return redirect()
             ->route('services.index')
@@ -50,6 +54,7 @@ class ServiceWebController extends Controller
 
         $service->update($validated['attributes']);
         $service->staffUsers()->sync($validated['staff_user_ids']);
+        $service->coveredByMemberships()->sync($validated['membership_ids']);
 
         return redirect()
             ->route('services.index')
@@ -72,7 +77,7 @@ class ServiceWebController extends Controller
     }
 
     /**
-     * @return array{attributes: array<string, mixed>, staff_user_ids: array<int, int>}
+     * @return array{attributes: array<string, mixed>, staff_user_ids: array<int, int>, membership_ids: array<int, int>}
      */
     private function validatedServicePayload(Request $request): array
     {
@@ -84,9 +89,12 @@ class ServiceWebController extends Controller
             'description' => ['nullable', 'string'],
             'staff_user_ids' => ['nullable', 'array'],
             'staff_user_ids.*' => ['integer', 'exists:users,id'],
+            'membership_ids' => ['nullable', 'array'],
+            'membership_ids.*' => ['integer', 'exists:memberships,id'],
         ]);
 
         $staffUserIds = array_values(array_unique(array_map('intval', $validated['staff_user_ids'] ?? [])));
+        $membershipIds = array_values(array_unique(array_map('intval', $validated['membership_ids'] ?? [])));
 
         return [
             'attributes' => [
@@ -98,6 +106,7 @@ class ServiceWebController extends Controller
                 'is_active' => $request->boolean('is_active'),
             ],
             'staff_user_ids' => $staffUserIds,
+            'membership_ids' => $membershipIds,
         ];
     }
 }

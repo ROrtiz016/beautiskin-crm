@@ -3,12 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
-use App\Models\Customer;
+use App\Models\ClinicSetting;
 use App\Models\Service;
 use App\Models\User;
+use App\Models\WaitlistEntry;
+use App\Services\AppointmentPolicyEnforcer;
+use App\Support\AppointmentFormLookupCache;
+use App\Notifications\AppointmentReminderNotification;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AppointmentWebController extends Controller
@@ -16,58 +24,48 @@ class AppointmentWebController extends Controller
     public function index(Request $request): View
     {
         $today = Carbon::today();
+        $hasExplicitDate = $request->query->has('date');
         $selectedDate = $this->parseDate((string) $request->query('date', $today->toDateString()), $today);
         $monthBase = $this->parseMonth((string) $request->query('month', $selectedDate->format('Y-m')), $selectedDate);
-        $status = (string) $request->query('status', '');
-        $customerId = (int) $request->query('customer_id', 0);
-        $serviceId = (int) $request->query('service_id', 0);
-        $arrived = (string) $request->query('arrived', '');
-        $staffUserId = (int) $request->query('staff_user_id', 0);
+        $staffUsers = AppointmentFormLookupCache::staffUsers();
 
         $monthStart = $monthBase->copy()->startOfMonth();
         $monthEnd = $monthBase->copy()->endOfMonth();
         $calendarStart = $monthStart->copy()->startOfWeek(Carbon::SUNDAY);
         $calendarEnd = $monthEnd->copy()->endOfWeek(Carbon::SATURDAY);
 
-        $baseQuery = Appointment::query()
-            ->with(['customer.memberships.membership', 'services', 'staffUser'])
-            ->when(in_array($status, ['booked', 'completed', 'cancelled', 'no_show'], true), function ($query) use ($status) {
-                $query->where('status', $status);
-            })
-            ->when($customerId > 0, function ($query) use ($customerId) {
-                $query->where('customer_id', $customerId);
-            })
-            ->when($serviceId > 0, function ($query) use ($serviceId) {
-                $query->whereHas('services', function ($serviceQuery) use ($serviceId) {
-                    $serviceQuery->where('service_id', $serviceId);
-                });
-            })
-            ->when(in_array($arrived, ['yes', 'no'], true), function ($query) use ($arrived) {
-                $query->where('arrived_confirmed', $arrived === 'yes');
-            })
-            ->when($staffUserId > 0, function ($query) use ($staffUserId) {
-                $query->where('staff_user_id', $staffUserId);
-            });
+        $filteredQuery = $this->appointmentsFilteredQuery($request);
 
-        $calendarAppointments = (clone $baseQuery)
+        $calendarAppointments = (clone $filteredQuery)
             ->whereBetween('scheduled_at', [$calendarStart, $calendarEnd])
             ->orderBy('scheduled_at')
-            ->get();
+            ->get(['id', 'scheduled_at']);
 
         $appointmentsByDate = $calendarAppointments->groupBy(
             fn (Appointment $appointment) => optional($appointment->scheduled_at)->toDateString()
         );
 
-        $selectedAppointments = $appointmentsByDate->get($selectedDate->toDateString(), collect());
+        if (! $hasExplicitDate && $appointmentsByDate->isNotEmpty() && ! $appointmentsByDate->has($selectedDate->toDateString())) {
+            $selectedDate = $this->defaultSelectedDate($appointmentsByDate, $today, $monthBase);
+        }
+
+        $selectedAppointments = (clone $this->appointmentsBaseQuery($request))
+            ->whereDate('scheduled_at', $selectedDate->toDateString())
+            ->orderBy('scheduled_at')
+            ->get();
+
+        $selectedWaitlistEntries = $this->waitlistEntriesForDate($selectedDate);
 
         $todayStr = $today->toDateString();
         if ($today->between($calendarStart->copy()->startOfDay(), $calendarEnd->copy()->endOfDay())) {
-            $todaysAppointments = $calendarAppointments
-                ->filter(fn (Appointment $appointment) => optional($appointment->scheduled_at)?->toDateString() === $todayStr)
-                ->sortBy('scheduled_at')
-                ->values();
+            $todaysAppointments = $selectedDate->isSameDay($today)
+                ? $selectedAppointments
+                : (clone $this->appointmentsBaseQuery($request))
+                    ->whereDate('scheduled_at', $today)
+                    ->orderBy('scheduled_at')
+                    ->get();
         } else {
-            $todaysAppointments = (clone $baseQuery)
+            $todaysAppointments = (clone $this->appointmentsBaseQuery($request))
                 ->whereDate('scheduled_at', $today)
                 ->orderBy('scheduled_at')
                 ->get();
@@ -98,31 +96,49 @@ class AppointmentWebController extends Controller
             'weeks' => $weeks,
             'todaysAppointments' => $todaysAppointments,
             'selectedAppointments' => $selectedAppointments,
-            'customers' => Customer::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
-            'services' => Service::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'price']),
-            'staffUsers' => User::query()->orderBy('name')->get(['id', 'name']),
-            'filters' => [
-                'status' => $status,
-                'customer_id' => $customerId,
-                'service_id' => $serviceId,
-                'arrived' => $arrived,
-                'staff_user_id' => $staffUserId,
-            ],
+            'selectedWaitlistEntries' => $selectedWaitlistEntries,
+            'staffAvailability' => $this->buildStaffAvailability($selectedAppointments, $staffUsers),
+            'customers' => AppointmentFormLookupCache::customers(),
+            'services' => AppointmentFormLookupCache::activeServices(),
+            'staffUsers' => $staffUsers,
+            'filters' => $this->filterParamsFromRequest($request),
+            'clinicSettings' => ClinicSetting::current(),
+        ]);
+    }
+
+    public function dayFragment(Request $request): JsonResponse
+    {
+        $today = Carbon::today();
+        $selectedDate = $this->parseDate((string) $request->query('date', $today->toDateString()), $today);
+        $monthBase = $this->parseMonth((string) $request->query('month', $selectedDate->format('Y-m')), $selectedDate);
+        $staffUsers = AppointmentFormLookupCache::staffUsers();
+        $selectedAppointments = (clone $this->appointmentsBaseQuery($request))
+            ->whereDate('scheduled_at', $selectedDate->toDateString())
+            ->orderBy('scheduled_at')
+            ->get();
+
+        return response()->json([
+            'html' => view('appointments.partials.selected-day-panel', [
+                'selectedAppointments' => $selectedAppointments,
+                'selectedDate' => $selectedDate,
+                'selectedWaitlistEntries' => $this->waitlistEntriesForDate($selectedDate),
+                'staffAvailability' => $this->buildStaffAvailability($selectedAppointments, $staffUsers),
+            ])->render(),
+            'date' => $selectedDate->toDateString(),
+            'month' => $monthBase->format('Y-m'),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
-            'staff_user_id' => ['nullable', 'exists:users,id'],
-            'scheduled_at' => ['required', 'date'],
-            'ends_at' => ['nullable', 'date', 'after:scheduled_at'],
-            'notes' => ['nullable', 'string'],
-            'services' => ['required', 'array', 'min:1'],
-            'services.*.service_id' => ['required', 'exists:services,id'],
-            'services.*.quantity' => ['nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $this->validateAppointmentPayload($request);
+        $this->ensureNoStaffConflict($validated);
+
+        $dateKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
+        AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded($dateKey);
+
+        $depositPaid = AppointmentPolicyEnforcer::depositPaidFromValidated($validated);
+        $depositAmount = $depositPaid ? AppointmentPolicyEnforcer::defaultDepositAmount() : null;
 
         $appointment = Appointment::query()->create([
             'customer_id' => $validated['customer_id'],
@@ -133,6 +149,8 @@ class AppointmentWebController extends Controller
             'arrived_confirmed' => false,
             'notes' => $validated['notes'] ?? null,
             'total_amount' => number_format(0, 2, '.', ''),
+            'deposit_amount' => $depositAmount,
+            'deposit_paid' => $depositPaid,
         ]);
 
         $this->syncAppointmentServices($appointment, $validated['services']);
@@ -143,6 +161,136 @@ class AppointmentWebController extends Controller
                 'date' => Carbon::parse($validated['scheduled_at'])->toDateString(),
             ])
             ->with('status', 'Appointment created successfully.');
+    }
+
+    public function update(Request $request, Appointment $appointment): RedirectResponse
+    {
+        $validated = $this->validateAppointmentPayload($request);
+        $this->ensureNoStaffConflict($validated, $appointment);
+
+        $newDateKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
+        $oldDateKey = AppointmentPolicyEnforcer::appointmentDateKey($appointment->scheduled_at);
+        if ($newDateKey !== $oldDateKey) {
+            AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded($newDateKey, $appointment->id);
+        }
+
+        $appointment->update([
+            'customer_id' => $validated['customer_id'],
+            'staff_user_id' => $validated['staff_user_id'] ?? null,
+            'scheduled_at' => $validated['scheduled_at'],
+            'ends_at' => $validated['ends_at'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $this->syncAppointmentServices($appointment, $validated['services']);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Appointment updated successfully.');
+    }
+
+    public function reschedule(Request $request, Appointment $appointment): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'target_date' => ['required', 'date'],
+        ]);
+
+        $targetDate = Carbon::parse($validated['target_date']);
+        $scheduledAt = $appointment->scheduled_at
+            ? $appointment->scheduled_at->copy()->setDate($targetDate->year, $targetDate->month, $targetDate->day)
+            : $targetDate->copy()->setTime(9, 0);
+        $endsAt = $appointment->ends_at
+            ? $appointment->ends_at->copy()->setDate($targetDate->year, $targetDate->month, $targetDate->day)
+            : null;
+
+        $payload = [
+            'customer_id' => $appointment->customer_id,
+            'staff_user_id' => $appointment->staff_user_id,
+            'scheduled_at' => $scheduledAt->format('Y-m-d H:i:s'),
+            'ends_at' => $endsAt?->format('Y-m-d H:i:s'),
+            'services' => $appointment->services->map(fn ($service) => [
+                'service_id' => $service->service_id,
+                'quantity' => $service->quantity,
+            ])->values()->all(),
+        ];
+
+        $this->ensureNoStaffConflict($payload, $appointment);
+
+        AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded(
+            AppointmentPolicyEnforcer::appointmentDateKey($payload['scheduled_at']),
+            $appointment->id
+        );
+
+        $appointment->update([
+            'scheduled_at' => $payload['scheduled_at'],
+            'ends_at' => $payload['ends_at'],
+        ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'ok',
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ]);
+        }
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Appointment rescheduled successfully.');
+    }
+
+    public function sendEmailReminder(Appointment $appointment): RedirectResponse
+    {
+        $appointment->loadMissing(['customer', 'services', 'staffUser']);
+
+        if (! $appointment->customer?->email) {
+            return redirect()
+                ->route('appointments.index', [
+                    'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                    'date' => optional($appointment->scheduled_at)->toDateString(),
+                ])
+                ->with('error', 'This customer does not have an email address on file.');
+        }
+
+        $appointment->customer->notify(new AppointmentReminderNotification($appointment));
+
+        $appointment->update([
+            'email_reminder_sent_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Appointment reminder email sent.');
+    }
+
+    public function updateStatus(Request $request, Appointment $appointment): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['booked', 'completed', 'cancelled', 'no_show'])],
+        ]);
+
+        if ($validated['status'] === 'cancelled' && $appointment->status !== 'cancelled') {
+            AppointmentPolicyEnforcer::assertCanMarkCancelled($appointment);
+        }
+
+        $appointment->update([
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Appointment marked as ' . str_replace('_', ' ', $validated['status']) . '.');
     }
 
     public function updateArrival(Request $request, Appointment $appointment): RedirectResponse
@@ -179,6 +327,239 @@ class AppointmentWebController extends Controller
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
             ->with('status', 'Staff assignment updated.');
+    }
+
+    public function storeWaitlist(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => ['required', 'exists:customers,id'],
+            'service_id' => ['nullable', 'exists:services,id'],
+            'staff_user_id' => ['nullable', 'exists:users,id'],
+            'preferred_date' => ['required', 'date'],
+            'preferred_start_time' => ['nullable', 'date_format:H:i'],
+            'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        WaitlistEntry::query()->create([
+            'customer_id' => $validated['customer_id'],
+            'service_id' => $validated['service_id'] ?? null,
+            'staff_user_id' => $validated['staff_user_id'] ?? null,
+            'preferred_date' => $validated['preferred_date'],
+            'preferred_start_time' => $validated['preferred_start_time'] ?? null,
+            'preferred_end_time' => $validated['preferred_end_time'] ?? null,
+            'status' => 'waiting',
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => Carbon::parse($validated['preferred_date'])->format('Y-m'),
+                'date' => Carbon::parse($validated['preferred_date'])->toDateString(),
+            ])
+            ->with('status', 'Customer added to waitlist.');
+    }
+
+    public function updateWaitlistStatus(Request $request, WaitlistEntry $waitlistEntry): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['waiting', 'contacted', 'booked', 'cancelled'])],
+        ]);
+
+        $waitlistEntry->update([
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($waitlistEntry->preferred_date)->format('Y-m'),
+                'date' => optional($waitlistEntry->preferred_date)->toDateString(),
+            ])
+            ->with('status', 'Waitlist entry marked as ' . $validated['status'] . '.');
+    }
+
+    /**
+     * Filtered appointments without eager loads (cheap for month grid counts).
+     *
+     * @return Builder<Appointment>
+     */
+    private function appointmentsFilteredQuery(Request $request): Builder
+    {
+        $status = (string) $request->query('status', '');
+        $customerId = (int) $request->query('customer_id', 0);
+        $search = trim((string) $request->query('search', ''));
+        $serviceId = (int) $request->query('service_id', 0);
+        $arrived = (string) $request->query('arrived', '');
+        $staffUserId = (int) $request->query('staff_user_id', 0);
+
+        return Appointment::query()
+            ->when(in_array($status, ['booked', 'completed', 'cancelled', 'no_show'], true), function (Builder $query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->when($customerId > 0, function (Builder $query) use ($customerId) {
+                $query->where('customer_id', $customerId);
+            })
+            ->when($search !== '', function (Builder $query) use ($search) {
+                $query->whereHas('customer', function (Builder $customerQuery) use ($search) {
+                    $customerQuery->where(function (Builder $matchQuery) use ($search) {
+                        $matchQuery
+                            ->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
+                });
+            })
+            ->when($serviceId > 0, function (Builder $query) use ($serviceId) {
+                $query->whereHas('services', function (Builder $serviceQuery) use ($serviceId) {
+                    $serviceQuery->where('service_id', $serviceId);
+                });
+            })
+            ->when(in_array($arrived, ['yes', 'no'], true), function (Builder $query) use ($arrived) {
+                $query->where('arrived_confirmed', $arrived === 'yes');
+            })
+            ->when($staffUserId > 0, function (Builder $query) use ($staffUserId) {
+                $query->where('staff_user_id', $staffUserId);
+            });
+    }
+
+    /**
+     * @return Builder<Appointment>
+     */
+    private function appointmentsBaseQuery(Request $request): Builder
+    {
+        return $this->appointmentsFilteredQuery($request)
+            ->with(['customer.memberships.membership.coveredServices', 'services.service.coveredByMemberships', 'staffUser']);
+    }
+
+    /**
+     * @return array{status: string, customer_id: int, search: string, service_id: int, arrived: string, staff_user_id: int}
+     */
+    private function filterParamsFromRequest(Request $request): array
+    {
+        return [
+            'status' => (string) $request->query('status', ''),
+            'customer_id' => (int) $request->query('customer_id', 0),
+            'search' => trim((string) $request->query('search', '')),
+            'service_id' => (int) $request->query('service_id', 0),
+            'arrived' => (string) $request->query('arrived', ''),
+            'staff_user_id' => (int) $request->query('staff_user_id', 0),
+        ];
+    }
+
+    private function validateAppointmentPayload(Request $request): array
+    {
+        return $request->validate(array_merge([
+            'customer_id' => ['required', 'exists:customers,id'],
+            'staff_user_id' => ['nullable', 'exists:users,id'],
+            'scheduled_at' => ['required', 'date'],
+            'ends_at' => ['nullable', 'date', 'after:scheduled_at'],
+            'notes' => ['nullable', 'string'],
+            'services' => ['required', 'array', 'min:1'],
+            'services.*.service_id' => ['required', 'exists:services,id'],
+            'services.*.quantity' => ['nullable', 'integer', 'min:1'],
+        ], AppointmentPolicyEnforcer::depositRulesForRequest()));
+    }
+
+    private function ensureNoStaffConflict(array $validated, ?Appointment $ignoreAppointment = null): void
+    {
+        $staffUserId = (int) ($validated['staff_user_id'] ?? 0);
+        if ($staffUserId === 0) {
+            return;
+        }
+
+        $start = Carbon::parse($validated['scheduled_at']);
+        $end = ! empty($validated['ends_at'])
+            ? Carbon::parse($validated['ends_at'])
+            : $start->copy()->addMinutes($this->estimatedDurationMinutes($validated['services'] ?? []));
+
+        $conflict = Appointment::query()
+            ->where('staff_user_id', $staffUserId)
+            ->whereNotIn('status', ['cancelled', 'no_show'])
+            ->when($ignoreAppointment, function (Builder $query) use ($ignoreAppointment) {
+                $query->where('id', '!=', $ignoreAppointment->id);
+            })
+            ->where(function (Builder $query) use ($start, $end) {
+                $query
+                    ->where('scheduled_at', '<', $end)
+                    ->whereRaw("COALESCE(ends_at, DATE_ADD(scheduled_at, INTERVAL 60 MINUTE)) > ?", [$start->format('Y-m-d H:i:s')]);
+            })
+            ->with(['customer:id,first_name,last_name'])
+            ->first();
+
+        if (! $conflict) {
+            return;
+        }
+
+        $name = trim((string) ($conflict->customer?->first_name . ' ' . $conflict->customer?->last_name));
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'scheduled_at' => [
+                'This staff member already has an overlapping appointment'
+                . ($name !== '' ? ' with ' . $name : '')
+                . ' at '
+                . optional($conflict->scheduled_at)->format('g:i A')
+                . '.',
+            ],
+        ]);
+    }
+
+    private function estimatedDurationMinutes(array $serviceLines): int
+    {
+        $total = 0;
+
+        foreach ($serviceLines as $line) {
+            $service = Service::query()->find((int) ($line['service_id'] ?? 0));
+            if (! $service) {
+                continue;
+            }
+
+            $total += ((int) $service->duration_minutes) * max(1, (int) ($line['quantity'] ?? 1));
+        }
+
+        return max($total, 60);
+    }
+
+    private function buildStaffAvailability(Collection $appointments, Collection $staffUsers): Collection
+    {
+        $availability = $staffUsers->map(function (User $staff) use ($appointments) {
+            $assigned = $appointments
+                ->filter(fn (Appointment $appointment) => (int) $appointment->staff_user_id === (int) $staff->id)
+                ->sortBy('scheduled_at')
+                ->values();
+
+            return [
+                'label' => $staff->name,
+                'appointments' => $assigned,
+                'count' => $assigned->count(),
+            ];
+        });
+
+        $unassigned = $appointments
+            ->filter(fn (Appointment $appointment) => empty($appointment->staff_user_id))
+            ->sortBy('scheduled_at')
+            ->values();
+
+        if ($unassigned->isNotEmpty()) {
+            $availability->push([
+                'label' => 'Unassigned',
+                'appointments' => $unassigned,
+                'count' => $unassigned->count(),
+            ]);
+        }
+
+        return $availability;
+    }
+
+    private function waitlistEntriesForDate(Carbon $selectedDate): Collection
+    {
+        return WaitlistEntry::query()
+            ->with(['customer', 'service', 'staffUser'])
+            ->whereDate('preferred_date', $selectedDate->toDateString())
+            ->whereIn('status', ['waiting', 'contacted'])
+            ->orderBy('preferred_start_time')
+            ->orderBy('created_at')
+            ->get();
     }
 
     private function syncAppointmentServices(Appointment $appointment, array $serviceLines): void
@@ -218,5 +599,29 @@ class AppointmentWebController extends Controller
     {
         $month = Carbon::createFromFormat('Y-m', $raw);
         return $month ?: $fallback->copy();
+    }
+
+    private function defaultSelectedDate(Collection $appointmentsByDate, Carbon $today, Carbon $monthBase): Carbon
+    {
+        $dateKeys = $appointmentsByDate->keys()
+            ->map(fn (string $key) => Carbon::parse($key))
+            ->sortBy(fn (Carbon $date) => $date->timestamp)
+            ->values();
+
+        $preferred = $dateKeys->first(function (Carbon $date) use ($today, $monthBase) {
+            return $date->month === $monthBase->month
+                && $date->year === $monthBase->year
+                && $date->greaterThanOrEqualTo($today);
+        });
+
+        if ($preferred) {
+            return $preferred->copy();
+        }
+
+        $inMonth = $dateKeys->first(function (Carbon $date) use ($monthBase) {
+            return $date->month === $monthBase->month && $date->year === $monthBase->year;
+        });
+
+        return ($inMonth ?: $dateKeys->first() ?: $today)->copy();
     }
 }

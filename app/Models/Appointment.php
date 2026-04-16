@@ -19,7 +19,10 @@ class Appointment extends Model
         'ends_at',
         'status',
         'arrived_confirmed',
+        'email_reminder_sent_at',
         'total_amount',
+        'deposit_amount',
+        'deposit_paid',
         'notes',
     ];
 
@@ -29,7 +32,10 @@ class Appointment extends Model
             'scheduled_at' => 'datetime',
             'ends_at' => 'datetime',
             'arrived_confirmed' => 'boolean',
+            'email_reminder_sent_at' => 'datetime',
             'total_amount' => 'decimal:2',
+            'deposit_amount' => 'decimal:2',
+            'deposit_paid' => 'boolean',
         ];
     }
 

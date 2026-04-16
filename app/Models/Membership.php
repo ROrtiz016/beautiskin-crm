@@ -4,7 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Membership extends Model
 {
@@ -29,5 +31,15 @@ class Membership extends Model
     public function customerMemberships(): HasMany
     {
         return $this->hasMany(CustomerMembership::class);
+    }
+
+    public function coveredServices(): BelongsToMany
+    {
+        return $this->belongsToMany(Service::class)->withTimestamps();
+    }
+
+    public function scheduledPriceChanges(): MorphMany
+    {
+        return $this->morphMany(ScheduledPriceChange::class, 'changeable');
     }
 }

@@ -27,7 +27,10 @@
             @enderror
         </div>
         <div>
-            <label for="password" class="mb-1 block text-sm font-medium">Password</label>
+            <div class="mb-1 flex items-center justify-between">
+                <label for="password" class="block text-sm font-medium">Password</label>
+                <a href="{{ route('password.request') }}" class="text-xs font-semibold text-pink-700 hover:text-pink-800">Forgot password?</a>
+            </div>
             <input
                 id="password"
                 name="password"

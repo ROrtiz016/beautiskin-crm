@@ -55,6 +55,7 @@
         <div class="rounded-xl border border-slate-200 bg-white p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500">Total Paid</p>
             <p class="mt-1 font-medium">${{ number_format((float) $totalSpent, 2) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Sum of all completed appointments (not limited to the lists below).</p>
         </div>
     </section>
 
@@ -210,6 +211,7 @@
 
     <section class="mb-6 rounded-xl border border-slate-200 bg-white p-5">
         <h2 class="text-lg font-semibold">Past Appointments</h2>
+        <p class="mt-1 text-xs text-slate-500">Showing up to {{ number_format($appointmentsProfileDisplayLimit) }} rows by latest scheduled time (includes upcoming in that window).</p>
         <div class="mt-4 space-y-3">
             @forelse ($pastAppointments as $appointment)
                 <div class="rounded-lg border border-slate-200 px-3 py-2">
@@ -304,6 +306,20 @@
                     <label class="mb-1 block text-sm font-medium">Notes</label>
                     <textarea name="notes" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ old('notes') }}</textarea>
                 </div>
+                @if ($clinicSettings->deposit_required)
+                    <div class="rounded-md border border-amber-200 bg-amber-50 p-3">
+                        <label class="flex items-start gap-2 text-sm text-amber-950">
+                            <input type="checkbox" name="deposit_paid" value="1" class="mt-0.5 rounded border-slate-300" @checked(old('deposit_paid'))>
+                            <span>
+                                Deposit collected (required)
+                                @if ($clinicSettings->default_deposit_amount)
+                                    — default <span class="font-semibold">${{ number_format((float) $clinicSettings->default_deposit_amount, 2) }}</span>
+                                @endif
+                            </span>
+                        </label>
+                        @error('deposit_paid') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                @endif
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeAddAppointmentModal()">Cancel</button>
                     <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save Appointment</button>
@@ -362,6 +378,7 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-slate-200 bg-white p-5">
             <h2 class="text-lg font-semibold">Payment History</h2>
+            <p class="mt-1 text-xs text-slate-500">Up to {{ number_format($paymentHistoryDisplayLimit) }} most recent completed visits.</p>
             <div class="mt-4 space-y-3">
                 @forelse ($paymentHistory as $payment)
                     <div class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">

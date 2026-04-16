@@ -25,6 +25,10 @@
                     <a href="{{ route('customers.index') }}" class="rounded-lg bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Customers</a>
                     <a href="{{ route('appointments.index') }}" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Appointments</a>
                     <a href="{{ route('services.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Services</a>
+                    <a href="{{ route('memberships.index') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Memberships</a>
+                    @can('access-admin-board')
+                        <a href="{{ route('admin.control-board') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Admin Board</a>
+                    @endcan
                 @else
                     <a href="{{ route('login') }}" class="rounded-lg bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Sign in</a>
                     <a href="{{ route('register') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Register</a>
@@ -49,6 +53,7 @@
             <article class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
                 <h2 class="text-lg font-semibold">Memberships</h2>
                 <p class="mt-2 text-sm text-slate-600">Track active plans and customer subscriptions.</p>
+                <a href="{{ route('memberships.index') }}" class="mt-3 inline-block text-sm font-semibold text-pink-700 hover:text-pink-800">Open Memberships →</a>
             </article>
         </section>
 

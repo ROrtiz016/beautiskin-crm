@@ -58,6 +58,8 @@ class AuthenticatedSessionController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        $request->session()->forget('impersonator_id');
+
         Auth::logout();
 
         $request->session()->invalidate();

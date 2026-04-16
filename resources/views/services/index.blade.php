@@ -9,7 +9,7 @@
     <div class="mb-6 flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold">Services</h1>
-            <p class="mt-1 text-sm text-slate-600">Treatment catalog, pricing, and which staff can perform each service.</p>
+            <p class="mt-1 text-sm text-slate-600">Treatment catalog, pricing, staff eligibility, and membership coverage rules.</p>
         </div>
         <button
             type="button"
@@ -47,6 +47,7 @@
                         <th class="py-2 pr-3 font-medium">Price</th>
                         <th class="py-2 pr-3 font-medium">Active</th>
                         <th class="py-2 pr-3 font-medium">Staff</th>
+                        <th class="py-2 pr-3 font-medium">Covered By</th>
                         <th class="py-2 pr-3 font-medium text-right">Actions</th>
                     </tr>
                 </thead>
@@ -67,6 +68,9 @@
                             <td class="py-3 pr-3 text-xs text-slate-600">
                                 {{ $service->staffUsers->pluck('name')->implode(', ') ?: 'None assigned' }}
                             </td>
+                            <td class="py-3 pr-3 text-xs text-slate-600">
+                                {{ $service->coveredByMemberships->pluck('name')->implode(', ') ?: 'No memberships' }}
+                            </td>
                             <td class="py-3 text-right">
                                 <button
                                     type="button"
@@ -86,7 +90,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="py-6 text-center text-slate-500">No services yet. Add your first treatment.</td>
+                            <td colspan="8" class="py-6 text-center text-slate-500">No services yet. Add your first treatment.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -105,6 +109,7 @@
                 'description' => $service->description,
                 'is_active' => (bool) $service->is_active,
                 'staff_user_ids' => $service->staffUsers->pluck('id')->values()->all(),
+                'membership_ids' => $service->coveredByMemberships->pluck('id')->values()->all(),
             ];
         @endphp
         <script type="application/json" id="service-payload-{{ $service->id }}">{!! json_encode($serviceEditPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
@@ -165,6 +170,26 @@
                     </div>
                     @error('staff_user_ids') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     @error('staff_user_ids.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Covered by memberships</label>
+                    <div class="mt-2 max-h-32 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">
+                        @forelse ($memberships as $membership)
+                            <label class="flex items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    name="membership_ids[]"
+                                    value="{{ $membership->id }}"
+                                    @checked(in_array($membership->id, old('membership_ids', []), true))
+                                >
+                                <span>{{ $membership->name }}</span>
+                            </label>
+                        @empty
+                            <p class="text-xs text-slate-500">No active memberships available.</p>
+                        @endforelse
+                    </div>
+                    @error('membership_ids') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('membership_ids.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="flex items-center gap-2 text-sm font-medium">
@@ -239,6 +264,25 @@
                     @error('staff_user_ids.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
+                    <label class="mb-1 block text-sm font-medium">Covered by memberships</label>
+                    <div id="editMembershipCheckboxes" class="mt-2 max-h-32 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">
+                        @foreach ($memberships as $membership)
+                            <label class="flex items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    class="edit-membership-cb"
+                                    name="membership_ids[]"
+                                    value="{{ $membership->id }}"
+                                    @checked(in_array($membership->id, old('membership_ids', []), true))
+                                >
+                                <span>{{ $membership->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('membership_ids') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('membership_ids.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div>
                     <label class="flex items-center gap-2 text-sm font-medium">
                         <input type="hidden" name="is_active" value="0">
                         <input id="edit_is_active" type="checkbox" name="is_active" value="1" class="rounded border-slate-300" @checked((string) old('is_active', '1') === '1')>
@@ -290,8 +334,12 @@
             document.getElementById('edit_description').value = payload.description || '';
             document.getElementById('edit_is_active').checked = Boolean(payload.is_active);
             const staffIds = Array.isArray(payload.staff_user_ids) ? payload.staff_user_ids.map(Number) : [];
+            const membershipIds = Array.isArray(payload.membership_ids) ? payload.membership_ids.map(Number) : [];
             document.querySelectorAll('.edit-staff-cb').forEach((cb) => {
                 cb.checked = staffIds.includes(Number(cb.value));
+            });
+            document.querySelectorAll('.edit-membership-cb').forEach((cb) => {
+                cb.checked = membershipIds.includes(Number(cb.value));
             });
 
             editModal.classList.remove('hidden');

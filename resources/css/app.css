@@ -9,3 +9,10 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* SortableJS: chosen item while dragging (class name set in resources/js/app.js) */
+.sortable-chosen-outline {
+    outline: 2px solid rgb(244 114 182);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+}

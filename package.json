@@ -6,6 +6,9 @@
         "build": "vite build",
         "dev": "vite"
     },
+    "dependencies": {
+        "sortablejs": "^1.15.6"
+    },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
         "concurrently": "^9.0.1",
