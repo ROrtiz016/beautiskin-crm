@@ -1,58 +1,85 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# BeautiSkin CRM (Laravel)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel-based CRM for an aesthetics clinic. This project currently includes SQL schema design and JSON API endpoints for:
 
-## About Laravel
+- Customer records
+- Appointment booking and history
+- Services catalog
+- Membership plans and customer memberships
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Core Domain
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- `customers`: personal and contact details
+- `services`: treatment catalog with duration and pricing
+- `memberships`: membership plans
+- `customer_memberships`: membership subscriptions per customer
+- `appointments`: booked sessions linked to customer and optional staff/member plan
+- `appointment_services`: line items for services performed in each appointment
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## API Endpoints
 
-## Learning Laravel
+All endpoints are mounted under `/api`:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- `GET|POST /api/customers`
+- `GET|PUT|DELETE /api/customers/{customer}`
+- `GET|POST /api/services`
+- `GET|PUT|DELETE /api/services/{service}`
+- `GET|POST /api/memberships`
+- `GET|PUT|DELETE /api/memberships/{membership}`
+- `GET|POST /api/customer-memberships`
+- `GET|PUT|DELETE /api/customer-memberships/{customerMembership}`
+- `GET|POST /api/appointments`
+- `GET|PUT|DELETE /api/appointments/{appointment}`
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Local Setup
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+1. Install PHP 8.2+, Composer, and a SQL database (MySQL/PostgreSQL).
+2. Install dependencies:
+   - `composer install`
+3. Configure environment:
+   - `copy .env.example .env`
+   - update database settings in `.env`
+4. Generate app key:
+   - `php artisan key:generate`
+5. Run migrations:
+   - `php artisan migrate`
+6. Start local server:
+   - `php artisan serve`
 
-## Agentic Development
+## Docker Setup (Recommended)
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+This project includes a Dockerized environment with:
 
-```bash
-composer require laravel/boost --dev
+- `app` container: PHP 8.3 + Composer + Laravel runtime
+- `mysql` container: MySQL 8.4 database
 
-php artisan boost:install
-```
+### Start with Docker
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+1. Build and run:
+   - `docker compose up --build`
+2. Open app:
+   - `http://localhost:8000`
+3. MySQL host for external tools:
+   - host: `127.0.0.1`
+   - port: `3307`
+   - database: `beautiskin_crm`
+   - username: `beautiskin`
+   - password: `beautiskin_password`
 
-## Contributing
+### Useful Commands
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- Run artisan command:
+  - `docker compose exec app php artisan migrate`
+- Run composer command:
+  - `docker compose exec app composer require vendor/package`
+- Stop containers:
+  - `docker compose down`
+- Stop and remove DB volume:
+  - `docker compose down -v`
 
-## Code of Conduct
+## Next Suggested Features
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Authentication and staff roles/permissions
+- Calendar-style booking UI
+- Reporting dashboard (revenue, visit frequency, retention)
+- Appointment reminders (SMS/email)
