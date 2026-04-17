@@ -7,6 +7,7 @@ use App\Models\AppointmentService;
 use App\Models\Customer;
 use App\Models\WaitlistEntry;
 use App\Services\AppointmentPolicyEnforcer;
+use App\Support\ReportDateRange;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ class ReportingController extends Controller
 {
     public function index(Request $request): View
     {
-        [$from, $to, $rangeStart, $rangeEnd] = $this->resolveDateRange($request);
+        [$from, $to, $rangeStart, $rangeEnd] = ReportDateRange::resolve($request);
 
         $rangeAgg = Appointment::query()
             ->whereBetween('scheduled_at', [$rangeStart, $rangeEnd])
@@ -87,7 +88,7 @@ class ReportingController extends Controller
 
     public function exportCsv(Request $request): StreamedResponse
     {
-        [$from, $to, $rangeStart, $rangeEnd] = $this->resolveDateRange($request);
+        [$from, $to, $rangeStart, $rangeEnd] = ReportDateRange::resolve($request);
         $tz = AppointmentPolicyEnforcer::clinicTimezone();
         $dailyRows = $this->buildDailyRows($from, $to, $tz, $rangeStart, $rangeEnd);
 
@@ -117,40 +118,6 @@ class ReportingController extends Controller
     }
 
     /**
-     * @return array{0: Carbon, 1: Carbon, 2: Carbon, 3: Carbon} from, to (clinic tz end of day), rangeStart, rangeEnd (app tz for DB)
-     */
-    private function resolveDateRange(Request $request): array
-    {
-        $request->validate([
-            'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date'],
-        ]);
-
-        $tz = AppointmentPolicyEnforcer::clinicTimezone();
-        $appTz = config('app.timezone');
-
-        $to = $request->filled('to')
-            ? Carbon::parse($request->query('to'), $tz)->endOfDay()
-            : now($tz)->endOfDay();
-        $from = $request->filled('from')
-            ? Carbon::parse($request->query('from'), $tz)->startOfDay()
-            : $to->copy()->subDays(29)->startOfDay();
-
-        if ($from->greaterThan($to)) {
-            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
-        }
-
-        if ($from->diffInDays($to) > 366) {
-            $from = $to->copy()->subDays(366)->startOfDay();
-        }
-
-        $rangeStart = $from->copy()->timezone($appTz);
-        $rangeEnd = $to->copy()->timezone($appTz);
-
-        return [$from, $to, $rangeStart, $rangeEnd];
-    }
-
-    /**
      * @return list<array{date: string, scheduled_count: int, completed_revenue: float}>
      */
     private function buildDailyRows(Carbon $from, Carbon $to, string $tz, Carbon $rangeStart, Carbon $rangeEnd): array
@@ -167,8 +134,7 @@ class ReportingController extends Controller
             Appointment::query()
                 ->select(['id', 'scheduled_at', 'status', 'total_amount'])
                 ->whereBetween('scheduled_at', [$rangeStart, $rangeEnd])
-                ->lazyById(1000, 'id')
-            as $appt
+                ->lazyById(1000, 'id') as $appt
         ) {
             if (! $appt->scheduled_at) {
                 continue;

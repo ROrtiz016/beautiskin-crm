@@ -16,7 +16,7 @@
         data-save-dashboard-url="{{ route('user.dashboard-layout.update') }}"
         data-initial-order='@json($controlBoardPanelOrder)'
     >
-        <section data-dashboard-panel="ctrl-audit" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-audit" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Recent activity</h2>
             <p class="mt-1 text-xs text-slate-500">
                 @if ($auditHasFilters)
@@ -139,7 +139,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-user-create" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-user-create" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Add New User</h2>
             <form method="POST" action="{{ route('admin.users.store') }}" class="mt-4 grid gap-3 md:grid-cols-2">
                 @csrf
@@ -193,7 +193,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-user-permissions" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-user-permissions" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">User Permissions</h2>
             <p class="mt-1 text-xs text-slate-500">Deactivated users cannot sign in. Use “View as” only for non-admin accounts; all actions are written to the audit log.</p>
             <div class="mt-4 space-y-4">
@@ -275,7 +275,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-clinic-profile" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-clinic-profile" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Clinic profile</h2>
             <p class="mt-1 text-xs text-slate-500">Core business settings used for reminders, scheduling defaults, and clinic-facing branding.</p>
             <form method="POST" action="{{ route('admin.clinic-profile.update') }}" class="mt-4 space-y-4">
@@ -312,7 +312,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-messaging" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-messaging" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Email / SMS settings</h2>
             <p class="mt-1 text-xs text-slate-500">Email settings are live now. SMS settings are stored for future gateway integration, including template toggles and lead times.</p>
             <form method="POST" action="{{ route('admin.messaging-settings.update') }}" class="mt-4 space-y-4">
@@ -366,7 +366,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-data-retention" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-data-retention" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Data retention & exports</h2>
             <p class="mt-1 text-xs text-slate-500">Create a JSON backup snapshot, export a single customer record bundle, or apply a GDPR-style delete that anonymizes personal data while preserving linked appointments.</p>
             <div class="mt-4 flex flex-wrap gap-3">
@@ -400,7 +400,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-tax" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-tax" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Tax & price rounding</h2>
             <p class="mt-1 text-xs text-slate-500">Default sales tax rate as a decimal (e.g. 0.0825 for 8.25%). Used for future checkout / quotes; list prices stay tax-exclusive unless you document otherwise.</p>
             <form method="POST" action="{{ route('admin.clinic-settings.update') }}" class="mt-4 grid gap-3 md:grid-cols-3">
@@ -425,7 +425,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-scheduled-prices" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-scheduled-prices" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Scheduled price changes</h2>
             <p class="mt-1 text-xs text-slate-500">Queue a new price with an effective date/time. Run <code class="rounded bg-slate-100 px-1">php artisan schedule:run</code> every minute in production, or run <code class="rounded bg-slate-100 px-1">php artisan clinic:apply-scheduled-prices</code> manually. The app registers this command every 15 minutes in <code class="rounded bg-slate-100 px-1">routes/console.php</code>.</p>
             <form method="POST" action="{{ route('admin.scheduled-prices.store') }}" class="mt-4 grid gap-3 md:grid-cols-3">
@@ -506,7 +506,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-service-prices" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-service-prices" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Service prices (live)</h2>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
                 @foreach ($services as $service)
@@ -524,7 +524,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-membership-prices" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-membership-prices" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Membership prices (live)</h2>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
                 @foreach ($memberships as $membership)
@@ -544,7 +544,7 @@
             @include('admin.partials.dashboard-drag-handle')
         </section>
 
-        <section data-dashboard-panel="ctrl-promotions" class="relative rounded-xl border border-slate-200 bg-white p-5">
+        <section data-dashboard-panel="ctrl-promotions" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Promotions & discounts</h2>
             <p class="mt-1 text-xs text-slate-500">Stackable promotions can combine with others (enforced at checkout later). Max discount cap is in USD per application. Minimum purchase is cart subtotal before discount. For “Services” or “Memberships”, pick specific items below or leave all unchecked to mean the whole catalog in that group.</p>
             <form method="POST" action="{{ route('admin.promotions.store') }}" class="mt-4 space-y-4">

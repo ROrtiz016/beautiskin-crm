@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\ClinicSetting;
 use App\Models\Service;
-use App\Models\User;
 use App\Models\WaitlistEntry;
+use App\Notifications\AppointmentReminderNotification;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentFormLookupCache;
-use App\Notifications\AppointmentReminderNotification;
+use App\Support\ContactMethod;
+use App\Support\LeadSource;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AppointmentWebController extends Controller
@@ -103,6 +105,7 @@ class AppointmentWebController extends Controller
             'staffUsers' => $staffUsers,
             'filters' => $this->filterParamsFromRequest($request),
             'clinicSettings' => ClinicSetting::current(),
+            'leadSourceOptions' => LeadSource::selectOptions(),
         ]);
     }
 
@@ -290,7 +293,7 @@ class AppointmentWebController extends Controller
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
-            ->with('status', 'Appointment marked as ' . str_replace('_', ' ', $validated['status']) . '.');
+            ->with('status', 'Appointment marked as '.str_replace('_', ' ', $validated['status']).'.');
     }
 
     public function updateArrival(Request $request, Appointment $appointment): RedirectResponse
@@ -339,7 +342,13 @@ class AppointmentWebController extends Controller
             'preferred_start_time' => ['nullable', 'date_format:H:i'],
             'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
             'notes' => ['nullable', 'string'],
+            'lead_source' => ['nullable', 'string', Rule::in(LeadSource::KEYS)],
         ]);
+
+        $leadSource = $validated['lead_source'] ?? 'unknown';
+        if (! is_string($leadSource) || ! in_array($leadSource, LeadSource::KEYS, true)) {
+            $leadSource = 'unknown';
+        }
 
         WaitlistEntry::query()->create([
             'customer_id' => $validated['customer_id'],
@@ -349,6 +358,7 @@ class AppointmentWebController extends Controller
             'preferred_start_time' => $validated['preferred_start_time'] ?? null,
             'preferred_end_time' => $validated['preferred_end_time'] ?? null,
             'status' => 'waiting',
+            'lead_source' => $leadSource,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -360,22 +370,68 @@ class AppointmentWebController extends Controller
             ->with('status', 'Customer added to waitlist.');
     }
 
-    public function updateWaitlistStatus(Request $request, WaitlistEntry $waitlistEntry): RedirectResponse
+    public function recordWaitlistContact(Request $request, WaitlistEntry $waitlistEntry): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['waiting', 'contacted', 'booked', 'cancelled'])],
+            'contact_method' => ['required', 'string', Rule::in(ContactMethod::KEYS)],
+            'contact_notes' => ['required', 'string', 'min:1', 'max:10000'],
+            'contacted_at' => ['required', 'date'],
+            'return_to' => ['nullable', 'string', Rule::in(['leads', 'appointments'])],
         ]);
 
+        $contactedAt = Carbon::parse($validated['contacted_at'], config('app.timezone'));
+
         $waitlistEntry->update([
-            'status' => $validated['status'],
+            'status' => 'contacted',
+            'contacted_at' => $contactedAt,
+            'contact_method' => $validated['contact_method'],
+            'contact_notes' => $validated['contact_notes'] ?? null,
+            'contacted_by_user_id' => $request->user()->id,
         ]);
+
+        $message = 'Contact logged and lead marked as contacted.';
+
+        if (($validated['return_to'] ?? '') === 'leads') {
+            return redirect()->route('leads.index')->with('status', $message);
+        }
 
         return redirect()
             ->route('appointments.index', [
                 'month' => optional($waitlistEntry->preferred_date)->format('Y-m'),
                 'date' => optional($waitlistEntry->preferred_date)->toDateString(),
             ])
-            ->with('status', 'Waitlist entry marked as ' . $validated['status'] . '.');
+            ->with('status', $message);
+    }
+
+    public function updateWaitlistStatus(Request $request, WaitlistEntry $waitlistEntry): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['waiting', 'booked', 'cancelled'])],
+            'return_to' => ['nullable', 'string', Rule::in(['leads', 'appointments'])],
+        ]);
+
+        $updates = ['status' => $validated['status']];
+        if ($validated['status'] === 'cancelled') {
+            $updates['contacted_at'] = null;
+            $updates['contact_method'] = null;
+            $updates['contact_notes'] = null;
+            $updates['contacted_by_user_id'] = null;
+        }
+
+        $waitlistEntry->update($updates);
+
+        $message = 'Waitlist entry marked as '.$validated['status'].'.';
+
+        if (($validated['return_to'] ?? '') === 'leads') {
+            return redirect()->route('leads.index')->with('status', $message);
+        }
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($waitlistEntry->preferred_date)->format('Y-m'),
+                'date' => optional($waitlistEntry->preferred_date)->toDateString(),
+            ])
+            ->with('status', $message);
     }
 
     /**
@@ -482,7 +538,7 @@ class AppointmentWebController extends Controller
             ->where(function (Builder $query) use ($start, $end) {
                 $query
                     ->where('scheduled_at', '<', $end)
-                    ->whereRaw("COALESCE(ends_at, DATE_ADD(scheduled_at, INTERVAL 60 MINUTE)) > ?", [$start->format('Y-m-d H:i:s')]);
+                    ->whereRaw('COALESCE(ends_at, DATE_ADD(scheduled_at, INTERVAL 60 MINUTE)) > ?', [$start->format('Y-m-d H:i:s')]);
             })
             ->with(['customer:id,first_name,last_name'])
             ->first();
@@ -491,15 +547,15 @@ class AppointmentWebController extends Controller
             return;
         }
 
-        $name = trim((string) ($conflict->customer?->first_name . ' ' . $conflict->customer?->last_name));
+        $name = trim((string) ($conflict->customer?->first_name.' '.$conflict->customer?->last_name));
 
-        throw \Illuminate\Validation\ValidationException::withMessages([
+        throw ValidationException::withMessages([
             'scheduled_at' => [
                 'This staff member already has an overlapping appointment'
-                . ($name !== '' ? ' with ' . $name : '')
-                . ' at '
-                . optional($conflict->scheduled_at)->format('g:i A')
-                . '.',
+                .($name !== '' ? ' with '.$name : '')
+                .' at '
+                .optional($conflict->scheduled_at)->format('g:i A')
+                .'.',
             ],
         ]);
     }
@@ -522,7 +578,7 @@ class AppointmentWebController extends Controller
 
     private function buildStaffAvailability(Collection $appointments, Collection $staffUsers): Collection
     {
-        $availability = $staffUsers->map(function (User $staff) use ($appointments) {
+        $availability = $staffUsers->map(function (object $staff) use ($appointments) {
             $assigned = $appointments
                 ->filter(fn (Appointment $appointment) => (int) $appointment->staff_user_id === (int) $staff->id)
                 ->sortBy('scheduled_at')
@@ -554,7 +610,7 @@ class AppointmentWebController extends Controller
     private function waitlistEntriesForDate(Carbon $selectedDate): Collection
     {
         return WaitlistEntry::query()
-            ->with(['customer', 'service', 'staffUser'])
+            ->with(['customer', 'service', 'staffUser', 'contactedBy:id,name'])
             ->whereDate('preferred_date', $selectedDate->toDateString())
             ->whereIn('status', ['waiting', 'contacted'])
             ->orderBy('preferred_start_time')
@@ -598,6 +654,7 @@ class AppointmentWebController extends Controller
     private function parseMonth(string $raw, Carbon $fallback): Carbon
     {
         $month = Carbon::createFromFormat('Y-m', $raw);
+
         return $month ?: $fallback->copy();
     }
 

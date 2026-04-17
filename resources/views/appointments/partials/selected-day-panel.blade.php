@@ -61,7 +61,7 @@
             $notesPreview = trim((string) $appointment->notes);
             $coverage = $coverageBadge($appointment);
         @endphp
-        <div class="rounded-lg border border-slate-200 px-3 py-3">
+        <div class="rounded-lg border border-slate-300/90 bg-slate-50/40 px-3 py-3 shadow-sm">
             <div class="flex items-start justify-between gap-3">
                 <button
                     type="button"
@@ -168,7 +168,7 @@
     </div>
     <div class="mt-3 space-y-3">
         @forelse ($selectedWaitlistEntries as $entry)
-            <div class="rounded-lg border border-slate-200 px-3 py-2">
+            <div class="rounded-lg border border-slate-300/90 bg-slate-50/40 px-3 py-2 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                         <p class="font-medium">{{ $entry->customer?->first_name }} {{ $entry->customer?->last_name }}</p>
@@ -185,6 +185,14 @@
                                 - {{ $entry->preferred_end_time }}
                             @endif
                         </p>
+                        <p class="text-xs text-slate-500">Source: {{ \App\Support\LeadSource::label($entry->lead_source ?? 'unknown') }}</p>
+                        @if ($entry->status === 'contacted' && $entry->contacted_at)
+                            <p class="mt-1 text-xs text-slate-600">
+                                Contact {{ $entry->contacted_at->timezone(config('app.timezone'))->format('M j g:i A') }}
+                                · {{ \App\Support\ContactMethod::label($entry->contact_method ?? '') }}
+                                @if ($entry->contactedBy) · {{ $entry->contactedBy->name }} @endif
+                            </p>
+                        @endif
                         @if ($entry->notes)
                             <p class="mt-1 text-xs text-slate-500">Notes: {{ \Illuminate\Support\Str::limit($entry->notes, 100) }}</p>
                         @endif
@@ -195,12 +203,15 @@
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @if ($entry->status !== 'contacted')
-                        <form method="POST" action="{{ route('appointments.waitlist.status.update', $entry) }}">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="status" value="contacted">
-                            <button class="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Mark contacted</button>
-                        </form>
+                        <button
+                            type="button"
+                            class="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                            data-open-waitlist-contact
+                            data-contact-url="{{ route('appointments.waitlist.contact', $entry) }}"
+                            data-return-to="appointments"
+                        >
+                            Log contact
+                        </button>
                     @endif
                     <form method="POST" action="{{ route('appointments.waitlist.status.update', $entry) }}">
                         @csrf
@@ -229,7 +240,7 @@
     </div>
     <div class="mt-3 space-y-3">
         @foreach ($staffAvailability as $row)
-            <div class="rounded-lg border border-slate-200 px-3 py-2">
+            <div class="rounded-lg border border-slate-300/90 bg-slate-50/40 px-3 py-2 shadow-sm">
                 <div class="flex items-center justify-between">
                     <p class="font-medium">{{ $row['label'] }}</p>
                     <span class="text-xs text-slate-500">{{ $row['count'] }} {{ $row['count'] === 1 ? 'appointment' : 'appointments' }}</span>

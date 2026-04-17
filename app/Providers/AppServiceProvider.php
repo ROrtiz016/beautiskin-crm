@@ -31,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
             return (bool) $user->is_admin || $user->hasAdminPermission('manage_users');
         });
 
+        Gate::define('view-sales', function (User $user): bool {
+            return (bool) $user->is_admin || $user->hasAdminPermission('seller');
+        });
+
         Gate::define('manage-feature-flags', function (User $user): bool {
             if (session()->has('impersonator_id')) {
                 return false;

@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ class AdminControlBoardController extends Controller
         'manage_service_prices',
         'manage_membership_prices',
         'manage_promotions',
+        'seller',
     ];
 
     /**
@@ -39,6 +41,7 @@ class AdminControlBoardController extends Controller
     private const ROLE_TEMPLATES = [
         'front_desk' => ['manage_service_prices', 'manage_promotions'],
         'provider' => [],
+        'seller' => ['seller'],
         'manager' => [
             'manage_user_permissions',
             'manage_service_prices',
@@ -52,6 +55,7 @@ class AdminControlBoardController extends Controller
         'custom' => 'Custom (use checkboxes)',
         'front_desk' => 'Front desk',
         'provider' => 'Provider',
+        'seller' => 'Seller',
         'manager' => 'Manager',
     ];
 
@@ -131,6 +135,7 @@ class AdminControlBoardController extends Controller
             'applyRoleTemplateLabels' => [
                 'front_desk' => self::ROLE_TEMPLATE_LABELS['front_desk'],
                 'provider' => self::ROLE_TEMPLATE_LABELS['provider'],
+                'seller' => self::ROLE_TEMPLATE_LABELS['seller'],
                 'manager' => self::ROLE_TEMPLATE_LABELS['manager'],
             ],
             'auditLogs' => $auditLogs,
@@ -149,9 +154,9 @@ class AdminControlBoardController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'is_admin' => ['nullable', 'boolean'],
-            'role_template' => ['nullable', 'string', 'in:custom,front_desk,provider,manager'],
+            'role_template' => ['nullable', 'string', 'in:custom,front_desk,provider,seller,manager'],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', 'in:' . implode(',', self::PERMISSIONS)],
+            'permissions.*' => ['string', 'in:'.implode(',', self::PERMISSIONS)],
         ]);
 
         $template = $validated['role_template'] ?? 'custom';
@@ -199,8 +204,8 @@ class AdminControlBoardController extends Controller
         $validated = $request->validate([
             'is_admin' => ['nullable', 'boolean'],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', 'in:' . implode(',', self::PERMISSIONS)],
-            'apply_role_template' => ['nullable', 'string', 'in:front_desk,provider,manager'],
+            'permissions.*' => ['string', 'in:'.implode(',', self::PERMISSIONS)],
+            'apply_role_template' => ['nullable', 'string', 'in:front_desk,provider,seller,manager'],
         ]);
 
         $apply = trim((string) ($validated['apply_role_template'] ?? ''));
@@ -476,7 +481,7 @@ class AdminControlBoardController extends Controller
             $change->id,
             null,
             [
-                'target' => class_basename($model) . ' #' . $model->getKey(),
+                'target' => class_basename($model).' #'.$model->getKey(),
                 'new_price' => (string) $change->new_price,
                 'effective_at' => $change->effective_at->toIso8601String(),
             ],
@@ -740,7 +745,7 @@ class AdminControlBoardController extends Controller
             ['customer_email' => $customer->email],
         );
 
-        $slug = preg_replace('/[^a-z0-9]+/i', '-', trim($customer->first_name . '-' . $customer->last_name)) ?: 'customer';
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', trim($customer->first_name.'-'.$customer->last_name)) ?: 'customer';
 
         return response()->streamDownload(function () use ($payload): void {
             echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -766,7 +771,7 @@ class AdminControlBoardController extends Controller
             $customer->memberships()->each(function ($membership): void {
                 $membership->update([
                     'status' => 'cancelled',
-                    'notes' => trim((string) ($membership->notes ? $membership->notes . "\n" : '') . 'Cancelled during GDPR delete workflow.'),
+                    'notes' => trim((string) ($membership->notes ? $membership->notes."\n" : '').'Cancelled during GDPR delete workflow.'),
                 ]);
             });
 
@@ -774,12 +779,12 @@ class AdminControlBoardController extends Controller
 
             $customer->update([
                 'first_name' => 'Deleted',
-                'last_name' => 'Customer #' . $customer->id,
+                'last_name' => 'Customer #'.$customer->id,
                 'email' => null,
                 'phone' => null,
                 'date_of_birth' => null,
                 'gender' => null,
-                'notes' => 'Personal data removed via GDPR delete workflow on ' . now()->toDateTimeString(),
+                'notes' => 'Personal data removed via GDPR delete workflow on '.now()->toDateTimeString(),
                 'gdpr_deleted_at' => now(),
             ]);
 
@@ -911,7 +916,7 @@ class AdminControlBoardController extends Controller
     }
 
     /**
-     * @return array{0: \Illuminate\Support\Collection<int, AdminAuditLog>, 1: bool}
+     * @return array{0: Collection<int, AdminAuditLog>, 1: bool}
      */
     private function filteredAuditLogs(Request $request): array
     {
@@ -958,7 +963,7 @@ class AdminControlBoardController extends Controller
         $search = trim((string) $request->query('audit_search', ''));
         if ($search !== '') {
             $escaped = addcslashes($search, '%_\\');
-            $like = '%' . $escaped . '%';
+            $like = '%'.$escaped.'%';
             $query->where(function (Builder $q) use ($like, $search) {
                 $q->where('action', 'like', $like)
                     ->orWhere('entity_type', 'like', $like)

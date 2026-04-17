@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Cached dropdown / lookup rows for appointment forms (customers, active services, staff).
  * Invalidated from model events when source data changes.
+ *
+ * Only plain arrays are persisted in the cache store so unserialization never yields
+ * __PHP_Incomplete_Class for Eloquent models (e.g. after deploy or in constrained workers).
  */
 final class AppointmentFormLookupCache
 {
@@ -24,29 +27,59 @@ final class AppointmentFormLookupCache
 
     public static function customers(): Collection
     {
-        return Cache::remember(self::CUSTOMERS_KEY, self::TTL_SECONDS, function () {
+        $rows = Cache::remember(self::CUSTOMERS_KEY, self::TTL_SECONDS, function (): array {
             return Customer::query()
                 ->orderBy('first_name')
                 ->orderBy('last_name')
-                ->get(['id', 'first_name', 'last_name', 'email', 'phone']);
+                ->get(['id', 'first_name', 'last_name', 'email', 'phone'])
+                ->map(fn (Customer $c) => [
+                    'id' => $c->id,
+                    'first_name' => $c->first_name,
+                    'last_name' => $c->last_name,
+                    'email' => $c->email,
+                    'phone' => $c->phone,
+                ])
+                ->values()
+                ->all();
         });
+
+        return self::toRowCollection($rows);
     }
 
     public static function activeServices(): Collection
     {
-        return Cache::remember(self::SERVICES_KEY, self::TTL_SECONDS, function () {
+        $rows = Cache::remember(self::SERVICES_KEY, self::TTL_SECONDS, function (): array {
             return Service::query()
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'price']);
+                ->get(['id', 'name', 'price'])
+                ->map(fn (Service $s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'price' => (string) $s->price,
+                ])
+                ->values()
+                ->all();
         });
+
+        return self::toRowCollection($rows);
     }
 
     public static function staffUsers(): Collection
     {
-        return Cache::remember(self::STAFF_KEY, self::TTL_SECONDS, function () {
-            return User::query()->orderBy('name')->get(['id', 'name']);
+        $rows = Cache::remember(self::STAFF_KEY, self::TTL_SECONDS, function (): array {
+            return User::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                ])
+                ->values()
+                ->all();
         });
+
+        return self::toRowCollection($rows);
     }
 
     public static function forgetCustomers(): void
@@ -69,5 +102,14 @@ final class AppointmentFormLookupCache
         Cache::forget(self::CUSTOMERS_KEY);
         Cache::forget(self::SERVICES_KEY);
         Cache::forget(self::STAFF_KEY);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return Collection<int, object>
+     */
+    private static function toRowCollection(array $rows): Collection
+    {
+        return collect($rows)->map(fn (array $row) => (object) $row);
     }
 }

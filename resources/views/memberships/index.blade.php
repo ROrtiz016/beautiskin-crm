@@ -20,7 +20,7 @@
         </button>
     </div>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <section class="crm-panel p-5">
         <form method="GET" action="{{ route('memberships.index') }}" class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
             <div class="flex-1">
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search</label>

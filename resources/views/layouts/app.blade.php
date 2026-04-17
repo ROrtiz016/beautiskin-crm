@@ -13,44 +13,81 @@
         <script src="https://cdn.tailwindcss.com"></script>
     @endif
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+@php
+    $navActive = function (string ...$patterns): string {
+        foreach ($patterns as $p) {
+            if (request()->routeIs($p)) {
+                return 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-700/20';
+            }
+        }
+
+        return 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
+    };
+@endphp
+<body class="min-h-screen bg-gradient-to-b from-slate-200 via-slate-100 to-slate-200 text-slate-900 antialiased">
     @if (session()->has('impersonator_id'))
-        <div class="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-950">
+        <div class="border-b border-amber-300/80 bg-amber-100 px-6 py-3 text-sm text-amber-950 shadow-sm">
             <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
                 <p>
                     <span class="font-semibold">Viewing as</span>
                     {{ auth()->user()->name }}
-                    <span class="text-amber-800">— you are signed in under this account for debugging.</span>
+                    <span class="text-amber-900/90">— you are signed in under this account for debugging.</span>
                 </p>
                 <form method="POST" action="{{ route('admin.impersonate.leave') }}" class="shrink-0">
                     @csrf
-                    <button type="submit" class="rounded-md bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800">Leave impersonation</button>
+                    <button type="submit" class="rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-900">
+                        Leave impersonation
+                    </button>
                 </form>
             </div>
         </div>
     @endif
-    <header class="border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <a href="{{ url('/') }}" class="text-lg font-bold">BeautiSkin CRM</a>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
-                <nav class="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600 sm:gap-5">
-                    <a href="{{ url('/') }}" class="hover:text-slate-900">Home</a>
-                    <a href="{{ route('customers.index') }}" class="hover:text-slate-900">Customers</a>
-                    <a href="{{ route('appointments.index') }}" class="hover:text-slate-900">Appointments</a>
-                    <a href="{{ route('services.index') }}" class="hover:text-slate-900">Services</a>
-                    <a href="{{ route('memberships.index') }}" class="hover:text-slate-900">Memberships</a>
+    <header class="sticky top-0 z-40 border-b border-slate-300/90 bg-white/95 shadow-sm shadow-slate-900/5 backdrop-blur-md">
+        <div class="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2 sm:px-5 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:py-2.5">
+            <div class="flex items-center gap-2">
+                <a href="{{ route('home') }}" class="text-base font-bold tracking-tight text-slate-900 hover:text-pink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600">
+                    BeautiSkin CRM
+                </a>
+                <span class="hidden h-4 w-px bg-slate-300 sm:block" aria-hidden="true"></span>
+                <span class="hidden text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:block">Clinic workspace</span>
+            </div>
+            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-5">
+                <nav class="flex flex-col gap-1.5 text-xs font-medium lg:min-w-0 lg:flex-row lg:flex-wrap lg:items-center lg:gap-1" aria-label="Main navigation">
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline">Daily</span>
+                        <a href="{{ route('customers.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('customers.*') }}">Customers</a>
+                        <a href="{{ route('appointments.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('appointments.*') }}">Appointments</a>
+                        <a href="{{ route('leads.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('leads.*') }}">Leads</a>
+                        <a href="{{ route('services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
+                        <a href="{{ route('memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
+                        @can('view-sales')
+                            <a href="{{ route('sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
+                        @endcan
+                    </div>
                     @can('access-admin-board')
-                        <a href="{{ route('admin.operations.index') }}" class="hover:text-slate-900">Operations</a>
-                        <a href="{{ route('admin.reports.index') }}" class="hover:text-slate-900">Reports</a>
-                        <a href="{{ route('admin.control-board') }}" class="hover:text-slate-900">Admin</a>
+                        <div class="flex flex-wrap items-center gap-1 border-t border-slate-200 pt-2 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                            <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline">Admin</span>
+                            <a href="{{ route('admin.operations.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.operations.*') }}">Operations</a>
+                            <a href="{{ route('admin.reports.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.reports.*') }}">Reports</a>
+                            <a href="{{ route('admin.control-board') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.control-board') }}">Control board</a>
+                        </div>
                     @endcan
                 </nav>
-                <div class="flex items-center gap-3 border-t border-slate-100 pt-3 text-sm sm:border-t-0 sm:pt-0">
-                    <span class="text-slate-600">{{ auth()->user()->name }}</span>
-                    <form method="POST" action="{{ route('logout') }}">
+                @php
+                    $authUser = auth()->user();
+                @endphp
+                <div class="flex w-full min-w-0 flex-col gap-1.5 border-t border-slate-200 pt-2 text-left sm:max-w-[15rem] sm:self-end sm:text-right lg:w-auto lg:items-end lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 lg:text-right">
+                    <div class="min-w-0">
+                        <p class="truncate text-xs font-semibold text-slate-900" title="{{ $authUser->name }}">{{ $authUser->name }}</p>
+                        <p class="truncate text-[11px] text-slate-500" title="{{ $authUser->email }}">{{ $authUser->email }}</p>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}" class="inline-block shrink-0 sm:self-end lg:self-end">
                         @csrf
-                        <button type="submit" class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                            Log out
+                        <button
+                            type="submit"
+                            class="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 shadow-sm transition hover:border-pink-300 hover:bg-pink-50 hover:text-pink-900 active:bg-pink-100/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500"
+                        >
+                            Logout
                         </button>
                     </form>
                 </div>
@@ -59,20 +96,22 @@
     </header>
 
     @can('view-experimental-ui')
-        <div class="border-b border-violet-200 bg-violet-50 px-6 py-2 text-center text-xs font-medium text-violet-900">
+        <div class="border-b border-violet-300/80 bg-violet-100 px-6 py-2.5 text-center text-xs font-medium text-violet-950 shadow-sm">
             Experimental UI is on for administrators — you may see additional panels and tools that are not final.
         </div>
     @endcan
 
-    <main class="mx-auto max-w-6xl px-6 py-8">
+    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         @if (session('status'))
-            <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {{ session('status') }}
+            <div class="mb-6 flex items-start gap-3 rounded-xl border border-emerald-300/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm" role="status">
+                <span class="mt-0.5 inline-block size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                <span>{{ session('status') }}</span>
             </div>
         @endif
         @if (session('error'))
-            <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {{ session('error') }}
+            <div class="mb-6 flex items-start gap-3 rounded-xl border border-rose-300/80 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-sm" role="alert">
+                <span class="mt-0.5 inline-block size-2 shrink-0 rounded-full bg-rose-500" aria-hidden="true"></span>
+                <span>{{ session('error') }}</span>
             </div>
         @endif
 

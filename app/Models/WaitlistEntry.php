@@ -18,6 +18,11 @@ class WaitlistEntry extends Model
         'preferred_start_time',
         'preferred_end_time',
         'status',
+        'lead_source',
+        'contacted_at',
+        'contact_method',
+        'contact_notes',
+        'contacted_by_user_id',
         'notes',
     ];
 
@@ -25,6 +30,7 @@ class WaitlistEntry extends Model
     {
         return [
             'preferred_date' => 'date',
+            'contacted_at' => 'datetime',
         ];
     }
 
@@ -41,5 +47,10 @@ class WaitlistEntry extends Model
     public function staffUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_user_id');
+    }
+
+    public function contactedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'contacted_by_user_id');
     }
 }

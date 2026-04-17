@@ -8,33 +8,33 @@
 @endphp
 
 @section('content')
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <h1 class="text-2xl font-bold">Customers</h1>
-            <p class="mt-1 text-sm text-slate-600">Manage clinic customer records.</p>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Customers</h1>
+            <p class="mt-1 max-w-xl text-sm leading-relaxed text-slate-600">Search and sort the directory, then open a profile for full history and booking.</p>
         </div>
         <button
             type="button"
-            class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700"
+            class="crm-btn-primary shrink-0"
             onclick="openCreateModal()"
         >
-            + New Customer
+            + New customer
         </button>
     </div>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <section class="crm-panel p-5">
         <form method="GET" action="{{ route('customers.index') }}" class="mb-4">
             <input
                 name="search"
                 value="{{ $search }}"
                 placeholder="Search by name, email, or phone"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                class="crm-input"
             >
         </form>
 
         <div class="overflow-x-auto">
             <table class="min-w-full text-left text-sm">
-                <thead class="border-b border-slate-200 text-slate-500">
+                <thead class="border-b border-slate-300 bg-slate-50/90 text-sm font-semibold text-slate-700">
                     <tr>
                         <th class="py-2 pr-3 font-medium">
                             <a href="{{ route('customers.index', array_merge(request()->query(), ['sort' => 'name', 'direction' => $nextDirection('name')])) }}" class="hover:text-slate-800">
@@ -114,8 +114,8 @@
         </div>
     </section>
 
-    <div id="createModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 px-4">
-        <div class="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+    <div id="createModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-xl">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Add Customer</h2>
                 <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeCreateModal()">✕</button>
@@ -126,54 +126,54 @@
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">First name</label>
-                        <input name="first_name" value="{{ old('first_name') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input name="first_name" value="{{ old('first_name') }}" class="crm-input" required>
                         @error('first_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Last name</label>
-                        <input name="last_name" value="{{ old('last_name') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input name="last_name" value="{{ old('last_name') }}" class="crm-input" required>
                         @error('last_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Email</label>
-                        <input name="email" type="email" value="{{ old('email') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input name="email" type="email" value="{{ old('email') }}" class="crm-input">
                         @error('email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Phone</label>
-                        <input name="phone" value="{{ old('phone') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input name="phone" value="{{ old('phone') }}" class="crm-input">
                         @error('phone') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Date of birth</label>
-                        <input name="date_of_birth" type="date" value="{{ old('date_of_birth') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input name="date_of_birth" type="date" value="{{ old('date_of_birth') }}" class="crm-input">
                         @error('date_of_birth') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Gender</label>
-                        <input name="gender" value="{{ old('gender') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input name="gender" value="{{ old('gender') }}" class="crm-input">
                         @error('gender') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
-                    <textarea name="notes" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ old('notes') }}</textarea>
+                    <textarea name="notes" rows="3" class="crm-input">{{ old('notes') }}</textarea>
                     @error('notes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeCreateModal()">Cancel</button>
-                    <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save customer</button>
+                    <button type="button" class="crm-btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                    <button type="submit" class="crm-btn-primary">Save customer</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 px-4">
-        <div class="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-xl">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Edit Customer</h2>
                 <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeEditModal()">✕</button>
@@ -186,43 +186,43 @@
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">First name</label>
-                        <input id="edit_first_name" name="first_name" value="{{ old('first_name') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input id="edit_first_name" name="first_name" value="{{ old('first_name') }}" class="crm-input" required>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Last name</label>
-                        <input id="edit_last_name" name="last_name" value="{{ old('last_name') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input id="edit_last_name" name="last_name" value="{{ old('last_name') }}" class="crm-input" required>
                     </div>
                 </div>
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Email</label>
-                        <input id="edit_email" name="email" type="email" value="{{ old('email') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input id="edit_email" name="email" type="email" value="{{ old('email') }}" class="crm-input">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Phone</label>
-                        <input id="edit_phone" name="phone" value="{{ old('phone') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input id="edit_phone" name="phone" value="{{ old('phone') }}" class="crm-input">
                     </div>
                 </div>
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Date of birth</label>
-                        <input id="edit_date_of_birth" name="date_of_birth" type="date" value="{{ old('date_of_birth') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input id="edit_date_of_birth" name="date_of_birth" type="date" value="{{ old('date_of_birth') }}" class="crm-input">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Gender</label>
-                        <input id="edit_gender" name="gender" value="{{ old('gender') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input id="edit_gender" name="gender" value="{{ old('gender') }}" class="crm-input">
                     </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
-                    <textarea id="edit_notes" name="notes" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ old('notes') }}</textarea>
+                    <textarea id="edit_notes" name="notes" rows="3" class="crm-input">{{ old('notes') }}</textarea>
                 </div>
                 @if ($updateHasErrors)
                     <p class="text-xs text-red-600">Please review the fields and try again.</p>
                 @endif
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeEditModal()">Cancel</button>
-                    <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Update customer</button>
+                    <button type="button" class="crm-btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="crm-btn-primary">Update customer</button>
                 </div>
             </form>
         </div>

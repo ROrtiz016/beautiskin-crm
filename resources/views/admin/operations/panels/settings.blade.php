@@ -1,5 +1,5 @@
 <div class="grid gap-8 lg:grid-cols-2">
-    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section class="crm-panel p-5">
         <h2 class="text-lg font-semibold text-slate-900">Appointment policy</h2>
         <p class="mt-1 text-sm text-slate-600">Enforced when creating, rescheduling, or cancelling appointments.</p>
         <form method="POST" action="{{ route('admin.operations.appointment-policy.update') }}" class="mt-4 space-y-4">
@@ -62,7 +62,7 @@
     </section>
 
     @can('manage-feature-flags')
-        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold text-slate-900">Feature flags</h2>
             <p class="mt-1 text-sm text-slate-600">Experimental UI is visible only to full administrators when enabled.</p>
             <form method="POST" action="{{ route('admin.operations.feature-flags.update') }}" class="mt-4 space-y-4">

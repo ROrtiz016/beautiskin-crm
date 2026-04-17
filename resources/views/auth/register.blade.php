@@ -20,7 +20,7 @@
                 autocomplete="name"
                 required
                 autofocus
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                class="crm-input"
             >
             @error('name')
                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -35,7 +35,7 @@
                 value="{{ old('email') }}"
                 autocomplete="username"
                 required
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                class="crm-input"
             >
             @error('email')
                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -49,7 +49,7 @@
                 type="password"
                 autocomplete="new-password"
                 required
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                class="crm-input"
             >
             @error('password')
                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -63,10 +63,10 @@
                 type="password"
                 autocomplete="new-password"
                 required
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-pink-500 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                class="crm-input"
             >
         </div>
-        <button type="submit" class="w-full rounded-md bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2">
+        <button type="submit" class="crm-btn-primary w-full justify-center">
             Register
         </button>
     </form>

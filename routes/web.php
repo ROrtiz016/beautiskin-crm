@@ -1,28 +1,29 @@
 <?php
 
+use App\Http\Controllers\AdminControlBoardController;
+use App\Http\Controllers\AdminImpersonationController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\CustomerMembershipController;
 use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\AppointmentWebController;
-use App\Http\Controllers\AdminControlBoardController;
-use App\Http\Controllers\OperationsDashboardController;
-use App\Http\Controllers\ReportingController;
-use App\Http\Controllers\UserDashboardLayoutController;
-use App\Http\Controllers\AdminImpersonationController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CustomerWebController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MembershipWebController;
+use App\Http\Controllers\OperationsDashboardController;
+use App\Http\Controllers\ReportingController;
+use App\Http\Controllers\SalesController;
 use App\Http\Controllers\ServiceWebController;
+use App\Http\Controllers\UserDashboardLayoutController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -57,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('appointments/{appointment}/status', [AppointmentWebController::class, 'updateStatus'])->name('appointments.status.update');
     Route::patch('appointments/{appointment}/arrival', [AppointmentWebController::class, 'updateArrival'])->name('appointments.arrival.update');
     Route::patch('appointments/{appointment}/staff', [AppointmentWebController::class, 'updateStaff'])->name('appointments.staff.update');
+    Route::post('appointments/waitlist/{waitlistEntry}/contact', [AppointmentWebController::class, 'recordWaitlistContact'])->name('appointments.waitlist.contact');
     Route::patch('appointments/waitlist/{waitlistEntry}/status', [AppointmentWebController::class, 'updateWaitlistStatus'])->name('appointments.waitlist.status.update');
     Route::patch(
         'customers/{customer}/contact-details',
@@ -74,6 +76,12 @@ Route::middleware('auth')->group(function () {
         'customers/{customer}/appointments/{appointment}/status',
         [CustomerWebController::class, 'updateAppointmentStatus']
     )->name('customers.appointments.status');
+
+    Route::get('sales', [SalesController::class, 'index'])
+        ->middleware('can:view-sales')
+        ->name('sales.index');
+
+    Route::get('leads', [LeadsController::class, 'index'])->name('leads.index');
 });
 
 Route::middleware(['auth', 'can:access-admin-board'])->prefix('admin')->name('admin.')->group(function () {

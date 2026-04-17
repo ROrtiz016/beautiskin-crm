@@ -20,39 +20,39 @@
 @endphp
 
 @section('content')
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h1 class="text-2xl font-bold">{{ $customer->first_name }} {{ $customer->last_name }}</h1>
-            <p class="mt-1 text-sm text-slate-600">Customer profile and history</p>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{{ $customer->first_name }} {{ $customer->last_name }}</h1>
+            <p class="mt-1 max-w-xl text-sm leading-relaxed text-slate-600">Profile, bookings, payments, and memberships for this client.</p>
         </div>
-        <a href="{{ route('customers.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Back to Customers
+        <a href="{{ route('customers.index') }}" class="crm-btn-secondary text-sm">
+            ← Back to customers
         </a>
     </div>
 
     <section class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="crm-panel p-4">
             <div class="flex items-center justify-between">
                 <p class="text-xs uppercase tracking-wide text-slate-500">Email</p>
                 <button type="button" class="text-slate-500 hover:text-slate-800" title="Edit email" onclick="openContactEditModal('email')">✎</button>
             </div>
             <p class="mt-1 font-medium">{{ $customer->email ?: '-' }}</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="crm-panel p-4">
             <div class="flex items-center justify-between">
                 <p class="text-xs uppercase tracking-wide text-slate-500">Phone</p>
                 <button type="button" class="text-slate-500 hover:text-slate-800" title="Edit phone" onclick="openContactEditModal('phone')">✎</button>
             </div>
             <p class="mt-1 font-medium">{{ $customer->phone ?: '-' }}</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="crm-panel p-4">
             <div class="flex items-center justify-between">
                 <p class="text-xs uppercase tracking-wide text-slate-500">Date of Birth</p>
                 <button type="button" class="text-slate-500 hover:text-slate-800" title="Edit date of birth" onclick="openContactEditModal('date_of_birth')">✎</button>
             </div>
             <p class="mt-1 font-medium">{{ $customer->date_of_birth?->format('Y-m-d') ?: '-' }}</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="crm-panel p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500">Total Paid</p>
             <p class="mt-1 font-medium">${{ number_format((float) $totalSpent, 2) }}</p>
             <p class="mt-1 text-xs text-slate-500">Sum of all completed appointments (not limited to the lists below).</p>
@@ -60,7 +60,7 @@
     </section>
 
     <div class="mb-6 grid gap-6 lg:grid-cols-3">
-        <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Next Appointment</h2>
             <div class="mt-4">
                 @if ($nextAppointment)
@@ -115,7 +115,7 @@
             </div>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
+        <section class="crm-panel p-5 lg:col-span-2">
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Booked Appointments</h2>
                 <button
@@ -128,7 +128,7 @@
             </div>
             <div class="mt-4 space-y-3">
                 @forelse ($bookedAppointments as $appointment)
-                    <div class="rounded-lg border border-slate-200 px-3 py-2">
+                    <div class="rounded-lg border border-slate-300/90 bg-slate-50/50 px-3 py-2 shadow-sm">
                         <div class="flex items-center justify-between">
                             <p class="font-medium">{{ optional($appointment->scheduled_at)->format('Y-m-d g:i A') }}</p>
                             <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $statusBadge($appointment->status) }}">
@@ -180,8 +180,8 @@
         </section>
     </div>
 
-    <div id="contactEditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 px-4">
-        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+    <div id="contactEditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-md">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Edit Contact Details</h2>
                 <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeContactEditModal()">✕</button>
@@ -191,30 +191,30 @@
                 @method('PATCH')
                 <div>
                     <label class="mb-1 block text-sm font-medium">Email</label>
-                    <input id="contact_email" name="email" type="email" value="{{ old('email', $customer->email) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <input id="contact_email" name="email" type="email" value="{{ old('email', $customer->email) }}" class="crm-input">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Phone</label>
-                    <input id="contact_phone" name="phone" value="{{ old('phone', $customer->phone) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <input id="contact_phone" name="phone" value="{{ old('phone', $customer->phone) }}" class="crm-input">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Date of birth</label>
-                    <input id="contact_dob" name="date_of_birth" type="date" value="{{ old('date_of_birth', optional($customer->date_of_birth)->format('Y-m-d')) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <input id="contact_dob" name="date_of_birth" type="date" value="{{ old('date_of_birth', optional($customer->date_of_birth)->format('Y-m-d')) }}" class="crm-input">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeContactEditModal()">Cancel</button>
-                    <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save</button>
+                    <button type="button" class="crm-btn-secondary" onclick="closeContactEditModal()">Cancel</button>
+                    <button type="submit" class="crm-btn-primary">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <section class="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+    <section class="mb-6 crm-panel p-5">
         <h2 class="text-lg font-semibold">Past Appointments</h2>
         <p class="mt-1 text-xs text-slate-500">Showing up to {{ number_format($appointmentsProfileDisplayLimit) }} rows by latest scheduled time (includes upcoming in that window).</p>
         <div class="mt-4 space-y-3">
             @forelse ($pastAppointments as $appointment)
-                <div class="rounded-lg border border-slate-200 px-3 py-2">
+                <div class="rounded-lg border border-slate-300/90 bg-slate-50/50 px-3 py-2 shadow-sm">
                     <div class="flex items-center justify-between">
                         <p class="font-medium">{{ optional($appointment->scheduled_at)->format('Y-m-d g:i A') }}</p>
                         <div class="text-right">
@@ -266,8 +266,8 @@
         </div>
     </section>
 
-    <div id="addAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 px-4">
-        <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+    <div id="addAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-lg">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Book New Appointment</h2>
                 <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeAddAppointmentModal()">✕</button>
@@ -276,15 +276,15 @@
                 @csrf
                 <div>
                     <label class="mb-1 block text-sm font-medium">Scheduled At</label>
-                    <input name="scheduled_at" type="datetime-local" value="{{ old('scheduled_at') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                    <input name="scheduled_at" type="datetime-local" value="{{ old('scheduled_at') }}" class="crm-input" required>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Ends At</label>
-                    <input name="ends_at" type="datetime-local" value="{{ old('ends_at') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <input name="ends_at" type="datetime-local" value="{{ old('ends_at') }}" class="crm-input">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Staff (optional)</label>
-                    <select name="staff_user_id" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <select name="staff_user_id" class="crm-input">
                         <option value="">Unassigned</option>
                         @foreach ($staffUsers as $staff)
                             <option value="{{ $staff->id }}" {{ (string) old('staff_user_id') === (string) $staff->id ? 'selected' : '' }}>
@@ -304,7 +304,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
-                    <textarea name="notes" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ old('notes') }}</textarea>
+                    <textarea name="notes" rows="3" class="crm-input">{{ old('notes') }}</textarea>
                 </div>
                 @if ($clinicSettings->deposit_required)
                     <div class="rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -321,15 +321,15 @@
                     </div>
                 @endif
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeAddAppointmentModal()">Cancel</button>
-                    <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save Appointment</button>
+                    <button type="button" class="crm-btn-secondary" onclick="closeAddAppointmentModal()">Cancel</button>
+                    <button type="submit" class="crm-btn-primary">Save appointment</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="updateAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 px-4">
-        <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+    <div id="updateAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-lg">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Update Appointment</h2>
                 <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeUpdateAppointmentModal()">✕</button>
@@ -339,15 +339,15 @@
                 @method('PATCH')
                 <div>
                     <label class="mb-1 block text-sm font-medium">Scheduled At</label>
-                    <input id="update_scheduled_at" name="scheduled_at" type="datetime-local" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                    <input id="update_scheduled_at" name="scheduled_at" type="datetime-local" class="crm-input" required>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Ends At</label>
-                    <input id="update_ends_at" name="ends_at" type="datetime-local" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <input id="update_ends_at" name="ends_at" type="datetime-local" class="crm-input">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Staff (optional)</label>
-                    <select id="update_staff_user_id" name="staff_user_id" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <select id="update_staff_user_id" name="staff_user_id" class="crm-input">
                         <option value="">Unassigned</option>
                         @foreach ($staffUsers as $staff)
                             <option value="{{ $staff->id }}">{{ $staff->name }}</option>
@@ -365,18 +365,18 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
-                    <textarea id="update_notes" name="notes" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                    <textarea id="update_notes" name="notes" rows="3" class="crm-input"></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeUpdateAppointmentModal()">Cancel</button>
-                    <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save Changes</button>
+                    <button type="button" class="crm-btn-secondary" onclick="closeUpdateAppointmentModal()">Cancel</button>
+                    <button type="submit" class="crm-btn-primary">Save changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Payment History</h2>
             <p class="mt-1 text-xs text-slate-500">Up to {{ number_format($paymentHistoryDisplayLimit) }} most recent completed visits.</p>
             <div class="mt-4 space-y-3">
@@ -398,11 +398,11 @@
             </div>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Services Received</h2>
             <div class="mt-4 space-y-3">
                 @forelse ($servicesReceived as $service)
-                    <div class="rounded-lg border border-slate-200 px-3 py-2">
+                    <div class="rounded-lg border border-slate-300/90 bg-slate-50/50 px-3 py-2 shadow-sm">
                         <div class="flex items-center justify-between">
                             <p class="font-medium">{{ $service->service_name }}</p>
                             <p class="text-sm font-semibold">${{ number_format((float) $service->total_spent, 2) }}</p>
@@ -419,7 +419,7 @@
     </div>
 
     <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Current Memberships</h2>
             <div class="mt-4 space-y-3">
                 @forelse ($currentMemberships as $membershipRecord)
@@ -438,11 +438,11 @@
             </div>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Past Memberships</h2>
             <div class="mt-4 space-y-3">
                 @forelse ($pastMemberships as $membershipRecord)
-                    <div class="rounded-lg border border-slate-200 px-3 py-2">
+                    <div class="rounded-lg border border-slate-300/90 bg-slate-50/50 px-3 py-2 shadow-sm">
                         <p class="font-medium">{{ $membershipRecord->membership?->name ?: 'Membership' }}</p>
                         <p class="text-xs text-slate-600">
                             {{ $membershipRecord->start_date?->format('Y-m-d') ?: '-' }}
@@ -459,7 +459,7 @@
     </div>
 
     @if ($customer->notes)
-        <section class="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+        <section class="mt-6 crm-panel p-5">
             <h2 class="text-lg font-semibold">Notes</h2>
             <p class="mt-3 text-sm text-slate-700">{{ $customer->notes }}</p>
         </section>
@@ -555,11 +555,11 @@
             wrapper.setAttribute('data-service-row', 'true');
             wrapper.className = 'grid gap-2 md:grid-cols-[1fr_120px_80px]';
             wrapper.innerHTML = `
-                <select name="services[${index}][service_id]" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                <select name="services[${index}][service_id]" class="crm-input">
                     ${serviceOptionsHtml(serviceId)}
                 </select>
-                <input name="services[${index}][quantity]" type="number" min="1" value="${quantity || 1}" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
-                <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Remove</button>
+                <input name="services[${index}][quantity]" type="number" min="1" value="${quantity || 1}" class="crm-input max-w-[6rem]">
+                <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-100">Remove</button>
             `;
             wrapper.querySelector('button').addEventListener('click', () => {
                 wrapper.remove();

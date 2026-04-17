@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,16 +18,32 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
-        User::factory()->create([
-            'name' => 'Jane Staff',
-            'email' => 'jane.staff@example.com',
-        ]);
+        $this->seedUserIfMissing('test@example.com', 'Test User');
+        $this->seedUserIfMissing('jane.staff@example.com', 'Jane Staff');
 
         $this->call(CustomerSeeder::class);
+        $this->call(DemoCatalogSeeder::class);
+    }
+
+    private function seedUserIfMissing(string $email, string $name): void
+    {
+        $user = User::withTrashed()->firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => $name,
+                'password' => 'password',
+            ]
+        );
+
+        if ($user->trashed()) {
+            $user->restore();
+        }
+
+        if ($user->wasRecentlyCreated) {
+            $user->forceFill([
+                'email_verified_at' => now(),
+                'remember_token' => Str::random(10),
+            ])->save();
+        }
     }
 }

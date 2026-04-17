@@ -6,7 +6,7 @@
         <p class="mt-1 text-sm text-slate-600">Update customer details.</p>
     </div>
 
-    <section class="max-w-2xl rounded-xl border border-slate-200 bg-white p-5">
+    <section class="max-w-2xl crm-panel p-5">
         <form method="POST" action="{{ route('customers.update', $customer) }}" class="space-y-3">
             @csrf
             @method('PUT')

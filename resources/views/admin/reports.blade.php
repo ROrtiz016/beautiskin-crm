@@ -12,7 +12,7 @@
         </div>
     </div>
 
-    <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section class="mb-8 crm-panel p-5">
         <form method="GET" action="{{ route('admin.reports.index') }}" class="flex flex-wrap items-end gap-4">
             <div>
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">From</label>
@@ -34,22 +34,22 @@
     </section>
 
     <section class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="crm-panel p-4">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Completed revenue</p>
             <p class="mt-1 text-2xl font-bold text-slate-900">${{ number_format($completedRevenue, 2) }}</p>
             <p class="mt-1 text-xs text-slate-500">Sum of <span class="font-medium">total_amount</span> for completed appointments in range.</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="crm-panel p-4">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled volume</p>
             <p class="mt-1 text-2xl font-bold text-slate-900">{{ number_format($appointmentVolume) }}</p>
             <p class="mt-1 text-xs text-slate-500">Appointments in range excluding cancelled.</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="crm-panel p-4">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">No-shows</p>
             <p class="mt-1 text-2xl font-bold text-slate-900">{{ number_format($noShowCount) }}</p>
             <p class="mt-1 text-xs text-slate-500">By scheduled date in range.</p>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="crm-panel p-4">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">New customers</p>
             <p class="mt-1 text-2xl font-bold text-slate-900">{{ number_format($newCustomers) }}</p>
             <p class="mt-1 text-xs text-slate-500">Profiles created in range.</p>
@@ -57,7 +57,7 @@
     </section>
 
     <div class="mb-8 grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold text-slate-900">Appointments by status</h2>
             <p class="mt-1 text-xs text-slate-500">Counts by <span class="font-medium">scheduled_at</span> falling in the range.</p>
             <ul class="mt-4 space-y-2 text-sm">
@@ -71,7 +71,7 @@
             <p class="mt-4 text-xs text-slate-500">Waitlist entries created in range: <span class="font-semibold text-slate-800">{{ number_format($waitlistOpened) }}</span></p>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold text-slate-900">Top services (by line revenue)</h2>
             <p class="mt-1 text-xs text-slate-500">From appointment line items on non-cancelled appointments.</p>
             <div class="mt-4 overflow-x-auto">
@@ -101,12 +101,12 @@
         </section>
     </div>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section class="crm-panel p-5">
         <h2 class="text-lg font-semibold text-slate-900">Daily breakdown</h2>
         <p class="mt-1 text-xs text-slate-500">Per clinic-local day: scheduled volume (excl. cancelled) and completed revenue.</p>
         <div class="mt-4 max-h-[28rem] overflow-y-auto">
             <table class="min-w-full text-left text-sm">
-                <thead class="sticky top-0 border-b border-slate-200 bg-white text-xs uppercase tracking-wide text-slate-500">
+                <thead class="sticky top-0 border-b border-slate-300 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <tr>
                         <th class="py-2 pr-4 font-semibold">Date</th>
                         <th class="py-2 pr-4 font-semibold">Scheduled</th>

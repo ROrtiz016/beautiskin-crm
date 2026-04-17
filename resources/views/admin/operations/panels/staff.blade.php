@@ -1,4 +1,4 @@
-<section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+<section class="crm-panel p-5">
     <h2 class="text-lg font-semibold text-slate-900">Staff utilization (today)</h2>
     <p class="mt-1 text-sm text-slate-600">Utilization compares booked duration to an 8-hour working day per staff member.</p>
     <div class="mt-4 overflow-x-auto">
