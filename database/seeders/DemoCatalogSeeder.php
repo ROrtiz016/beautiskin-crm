@@ -83,6 +83,7 @@ class DemoCatalogSeeder extends Seeder
 
         $byName = [];
         foreach ($rows as $row) {
+            $isRetail = in_array(strtolower(trim((string) $row['category'])), ['product', 'products', 'retail'], true);
             $byName[$row['name']] = Service::query()->updateOrCreate(
                 ['name' => $row['name']],
                 [
@@ -91,6 +92,9 @@ class DemoCatalogSeeder extends Seeder
                     'price' => number_format((float) $row['price'], 2, '.', ''),
                     'description' => $row['description'],
                     'is_active' => true,
+                    'track_inventory' => $isRetail,
+                    'stock_quantity' => $isRetail ? random_int(40, 120) : 0,
+                    'reorder_level' => $isRetail ? 12 : 5,
                 ]
             );
         }

@@ -8,11 +8,15 @@ use App\Models\ClinicSetting;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Services\AppointmentPolicyEnforcer;
+use App\Support\AppointmentCancellation;
+use App\Services\InventoryStockService;
 use App\Support\AppointmentFormLookupCache;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class CustomerWebController extends Controller
@@ -148,9 +152,54 @@ class CustomerWebController extends Controller
     {
         $customer->load([
             'appointments' => function ($query) {
-                $query->with(['services', 'staffUser'])
+                $query->with(['services', 'staffUser', 'cancelledBy:id,name'])
                     ->latest('scheduled_at')
                     ->limit(self::CUSTOMER_PROFILE_APPOINTMENTS_LIMIT);
+            },
+            'opportunities' => function ($query) {
+                $query->select([
+                    'id',
+                    'customer_id',
+                    'owner_user_id',
+                    'title',
+                    'stage',
+                    'amount',
+                    'expected_close_date',
+                    'updated_at',
+                ])
+                    ->with(['owner:id,name'])
+                    ->orderByDesc('updated_at')
+                    ->limit(25);
+            },
+            'tasks' => function ($query) {
+                $query->select([
+                    'id',
+                    'customer_id',
+                    'opportunity_id',
+                    'assigned_to_user_id',
+                    'title',
+                    'status',
+                    'kind',
+                    'due_at',
+                ])
+                    ->with(['assignedTo:id,name', 'opportunity:id,title'])
+                    ->orderByRaw("CASE WHEN tasks.status = 'pending' THEN 0 ELSE 1 END")
+                    ->orderBy('tasks.due_at')
+                    ->limit(40);
+            },
+            'activities' => function ($query) {
+                $query->select([
+                    'id',
+                    'customer_id',
+                    'user_id',
+                    'event_type',
+                    'category',
+                    'summary',
+                    'created_at',
+                ])
+                    ->with(['user:id,name'])
+                    ->latest('created_at')
+                    ->limit(50);
             },
             'memberships.membership',
         ]);
@@ -220,6 +269,18 @@ class CustomerWebController extends Controller
             ->pluck('id')
             ->all();
 
+        $retailSaleServices = Service::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $keys = Service::retailCategoryKeys();
+                $placeholders = implode(',', array_fill(0, count($keys), '?'));
+                $query
+                    ->whereRaw('LOWER(TRIM(COALESCE(category, ""))) IN ('.$placeholders.')', $keys)
+                    ->orWhere('track_inventory', true);
+            })
+            ->orderBy('name')
+            ->get();
+
         return view('customers.show', [
             'customer' => $customer,
             'paymentHistory' => $paymentHistory,
@@ -234,6 +295,7 @@ class CustomerWebController extends Controller
             'pastAppointments' => $pastAppointments,
             'recentlyChangedAppointmentIds' => $recentlyChangedAppointmentIds,
             'services' => AppointmentFormLookupCache::activeServices(),
+            'retailSaleServices' => $retailSaleServices,
             'staffUsers' => AppointmentFormLookupCache::staffUsers(),
             'clinicSettings' => ClinicSetting::current(),
         ]);
@@ -287,13 +349,9 @@ class CustomerWebController extends Controller
             'status' => ['required', Rule::in(['booked', 'completed', 'cancelled'])],
         ]);
 
-        if ($validated['status'] === 'cancelled' && $appointment->status !== 'cancelled') {
-            AppointmentPolicyEnforcer::assertCanMarkCancelled($appointment);
-        }
-
-        $appointment->update([
-            'status' => $validated['status'],
-        ]);
+        $appointment->update(
+            AppointmentCancellation::attributesWhenChangingStatus($request, $appointment, $validated['status'])
+        );
 
         return redirect()
             ->route('customers.show', $customer)
@@ -329,11 +387,98 @@ class CustomerWebController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        $this->syncAppointmentServices($appointment, $validated['services'] ?? []);
+        if ($appointment->status !== 'completed') {
+            $this->syncAppointmentServices($appointment, $validated['services'] ?? []);
+        }
 
         return redirect()
             ->route('customers.show', $customer)
             ->with('status', 'Appointment updated successfully.');
+    }
+
+    public function storeAppointmentRetailLine(Request $request, Customer $customer, Appointment $appointment): RedirectResponse
+    {
+        if ($appointment->customer_id !== $customer->id) {
+            abort(404);
+        }
+
+        if ($appointment->status !== 'completed') {
+            return redirect()
+                ->route('customers.show', $customer)
+                ->with('error', 'Retail items can only be added to completed visits.');
+        }
+
+        $validated = $request->validate([
+            'service_id' => ['required', 'integer', 'exists:services,id'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:999'],
+        ]);
+
+        $service = Service::query()
+            ->whereKey($validated['service_id'])
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        if (! $service->eligibleForRetailSaleOnVisit()) {
+            return redirect()
+                ->route('customers.show', $customer)
+                ->with('error', 'That catalog item cannot be sold as retail on a completed visit.');
+        }
+
+        $quantity = (int) $validated['quantity'];
+
+        if ($service->track_inventory && (int) $service->stock_quantity < $quantity) {
+            return redirect()
+                ->route('customers.show', $customer)
+                ->with('error', 'Insufficient stock for '.$service->name.'.');
+        }
+
+        try {
+            DB::transaction(function () use ($appointment, $service, $quantity) {
+                $locked = Service::query()->whereKey($service->id)->lockForUpdate()->first();
+                if (! $locked || ! $locked->is_active) {
+                    throw ValidationException::withMessages([
+                        'service_id' => 'That item is no longer available.',
+                    ]);
+                }
+
+                if ($locked->track_inventory && (int) $locked->stock_quantity < $quantity) {
+                    throw ValidationException::withMessages([
+                        'quantity' => 'Insufficient stock for '.$locked->name.'.',
+                    ]);
+                }
+
+                $unit = (float) $locked->price;
+                $lineTotal = round($unit * $quantity, 2);
+
+                $appointment->services()->create([
+                    'service_id' => $locked->id,
+                    'service_name' => $locked->name,
+                    'duration_minutes' => (int) $locked->duration_minutes,
+                    'quantity' => $quantity,
+                    'unit_price' => number_format($unit, 2, '.', ''),
+                    'line_total' => number_format($lineTotal, 2, '.', ''),
+                ]);
+
+                InventoryStockService::deductForService($locked, $quantity);
+
+                $appointment->refresh();
+                $sum = round((float) $appointment->services()->sum('line_total'), 2);
+                $appointment->update([
+                    'total_amount' => number_format($sum, 2, '.', ''),
+                ]);
+            });
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first() ?? 'Unable to add retail line.';
+
+            return redirect()
+                ->route('customers.show', $customer)
+                ->withErrors($e->errors())
+                ->with('error', $message);
+        }
+
+        return redirect()
+            ->route('customers.show', $customer)
+            ->with('status', 'Retail line added to the visit.');
     }
 
     private function syncAppointmentServices(Appointment $appointment, array $serviceLines): void

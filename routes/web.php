@@ -7,19 +7,26 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\CustomerMembershipController;
 use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\ActivityFeedController;
 use App\Http\Controllers\AppointmentWebController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\CustomerCommunicationLogController;
+use App\Http\Controllers\CustomerTemplatedCommunicationController;
+use App\Http\Controllers\CustomerTimelineNoteController;
 use App\Http\Controllers\CustomerWebController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InventoryWebController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MembershipWebController;
 use App\Http\Controllers\OperationsDashboardController;
 use App\Http\Controllers\ReportingController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\SalesOpportunityController;
 use App\Http\Controllers\ServiceWebController;
+use App\Http\Controllers\TaskWebController;
 use App\Http\Controllers\UserDashboardLayoutController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,10 +49,16 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::post('admin/impersonate/leave', [AdminImpersonationController::class, 'leave'])->name('admin.impersonate.leave');
 
+    Route::get('activity', [ActivityFeedController::class, 'index'])->name('activity.index');
+    Route::get('customers/{customer}/timeline', [ActivityFeedController::class, 'customer'])->name('customers.timeline.show');
+    Route::post('customers/{customer}/communications', [CustomerCommunicationLogController::class, 'store'])->name('customers.communications.store');
+    Route::post('customers/{customer}/communications/templated', [CustomerTemplatedCommunicationController::class, 'store'])->name('customers.communications.templated');
+
     Route::resource('customers', CustomerWebController::class)
         ->only(['index', 'show', 'store', 'edit', 'update', 'destroy']);
     Route::resource('services', ServiceWebController::class)
         ->only(['index', 'store', 'update', 'destroy']);
+    Route::get('inventory', [InventoryWebController::class, 'index'])->name('inventory.index');
     Route::resource('memberships', MembershipWebController::class)
         ->only(['index', 'store', 'update', 'destroy']);
     Route::get('appointments/day', [AppointmentWebController::class, 'dayFragment'])->name('appointments.day');
@@ -76,12 +89,30 @@ Route::middleware('auth')->group(function () {
         'customers/{customer}/appointments/{appointment}/status',
         [CustomerWebController::class, 'updateAppointmentStatus']
     )->name('customers.appointments.status');
+    Route::post(
+        'customers/{customer}/appointments/{appointment}/retail-lines',
+        [CustomerWebController::class, 'storeAppointmentRetailLine']
+    )->name('customers.appointments.retail-lines.store');
+    Route::post('customers/{customer}/timeline-notes', [CustomerTimelineNoteController::class, 'store'])->name('customers.timeline-notes.store');
 
     Route::get('sales', [SalesController::class, 'index'])
         ->middleware('can:view-sales')
         ->name('sales.index');
 
+    Route::get('sales/pipeline', [SalesOpportunityController::class, 'index'])->name('sales.pipeline.index');
+    Route::post('sales/opportunities', [SalesOpportunityController::class, 'store'])->name('sales.opportunities.store');
+    Route::patch('sales/opportunities/{opportunity}', [SalesOpportunityController::class, 'update'])->name('sales.opportunities.update');
+    Route::patch('sales/opportunities/{opportunity}/stage', [SalesOpportunityController::class, 'updateStage'])->name('sales.opportunities.stage');
+    Route::delete('sales/opportunities/{opportunity}', [SalesOpportunityController::class, 'destroy'])->name('sales.opportunities.destroy');
+
     Route::get('leads', [LeadsController::class, 'index'])->name('leads.index');
+
+    Route::get('tasks', [TaskWebController::class, 'index'])->name('tasks.index');
+    Route::post('tasks', [TaskWebController::class, 'store'])->name('tasks.store');
+    Route::patch('tasks/{task}', [TaskWebController::class, 'update'])->name('tasks.update');
+    Route::patch('tasks/{task}/complete', [TaskWebController::class, 'complete'])->name('tasks.complete');
+    Route::patch('tasks/{task}/reopen', [TaskWebController::class, 'reopen'])->name('tasks.reopen');
+    Route::delete('tasks/{task}', [TaskWebController::class, 'destroy'])->name('tasks.destroy');
 });
 
 Route::middleware(['auth', 'can:access-admin-board'])->prefix('admin')->name('admin.')->group(function () {

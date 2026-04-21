@@ -614,6 +614,12 @@ class AdminControlBoardController extends Controller
             'reminder_email_subject_template' => ['nullable', 'string', 'max:255'],
             'reminder_email_body_template' => ['nullable', 'string'],
             'reminder_sms_template' => ['nullable', 'string', 'max:500'],
+            'followup_email_subject_template' => ['nullable', 'string', 'max:255'],
+            'followup_email_body_template' => ['nullable', 'string'],
+            'followup_sms_template' => ['nullable', 'string', 'max:500'],
+            'no_show_email_subject_template' => ['nullable', 'string', 'max:255'],
+            'no_show_email_body_template' => ['nullable', 'string'],
+            'no_show_sms_template' => ['nullable', 'string', 'max:500'],
         ]);
 
         $settings = ClinicSetting::current();
@@ -625,6 +631,12 @@ class AdminControlBoardController extends Controller
             'reminder_email_subject_template' => $settings->reminder_email_subject_template,
             'reminder_email_body_template' => $settings->reminder_email_body_template,
             'reminder_sms_template' => $settings->reminder_sms_template,
+            'followup_email_subject_template' => $settings->followup_email_subject_template,
+            'followup_email_body_template' => $settings->followup_email_body_template,
+            'followup_sms_template' => $settings->followup_sms_template,
+            'no_show_email_subject_template' => $settings->no_show_email_subject_template,
+            'no_show_email_body_template' => $settings->no_show_email_body_template,
+            'no_show_sms_template' => $settings->no_show_sms_template,
         ];
 
         $settings->update([
@@ -635,6 +647,12 @@ class AdminControlBoardController extends Controller
             'reminder_email_subject_template' => $validated['reminder_email_subject_template'] ?? null,
             'reminder_email_body_template' => $validated['reminder_email_body_template'] ?? null,
             'reminder_sms_template' => $validated['reminder_sms_template'] ?? null,
+            'followup_email_subject_template' => $validated['followup_email_subject_template'] ?? null,
+            'followup_email_body_template' => $validated['followup_email_body_template'] ?? null,
+            'followup_sms_template' => $validated['followup_sms_template'] ?? null,
+            'no_show_email_subject_template' => $validated['no_show_email_subject_template'] ?? null,
+            'no_show_email_body_template' => $validated['no_show_email_body_template'] ?? null,
+            'no_show_sms_template' => $validated['no_show_sms_template'] ?? null,
         ]);
 
         AdminAuditLog::record(
@@ -652,6 +670,12 @@ class AdminControlBoardController extends Controller
                 'reminder_email_subject_template' => $settings->reminder_email_subject_template,
                 'reminder_email_body_template' => $settings->reminder_email_body_template,
                 'reminder_sms_template' => $settings->reminder_sms_template,
+                'followup_email_subject_template' => $settings->followup_email_subject_template,
+                'followup_email_body_template' => $settings->followup_email_body_template,
+                'followup_sms_template' => $settings->followup_sms_template,
+                'no_show_email_subject_template' => $settings->no_show_email_subject_template,
+                'no_show_email_body_template' => $settings->no_show_email_body_template,
+                'no_show_sms_template' => $settings->no_show_sms_template,
             ],
         );
 
@@ -697,6 +721,7 @@ class AdminControlBoardController extends Controller
             'memberships' => Membership::query()->get()->toArray(),
             'appointments' => DB::table('appointments')->get()->toArray(),
             'appointment_services' => DB::table('appointment_services')->get()->toArray(),
+            'communication_logs' => DB::table('communication_logs')->get()->toArray(),
             'promotions' => Promotion::query()->with(['targetedServices:id', 'targetedMemberships:id'])->get()->toArray(),
             'scheduled_price_changes' => ScheduledPriceChange::query()->get()->toArray(),
             'users' => User::withTrashed()->get(['id', 'name', 'email', 'is_admin', 'permissions', 'deleted_at'])->toArray(),

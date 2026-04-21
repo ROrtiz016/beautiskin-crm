@@ -9,7 +9,7 @@
     <div class="mb-6 flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold">Services</h1>
-            <p class="mt-1 text-sm text-slate-600">Treatment catalog, pricing, staff eligibility, and membership coverage rules.</p>
+            <p class="mt-1 text-sm text-slate-600">Treatment catalog, pricing, staff eligibility, membership coverage, and optional retail stock.</p>
         </div>
         <button
             type="button"
@@ -19,6 +19,20 @@
             + New Service
         </button>
     </div>
+
+    @if ($lowStockServices->isNotEmpty())
+        <div class="mb-6 rounded-xl border border-amber-300/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm" role="alert">
+            <p class="font-semibold">Low stock (tracked items)</p>
+            <p class="mt-1 text-amber-900/95">
+                @foreach ($lowStockServices as $svc)
+                    <span class="mr-2 inline-block">{{ $svc->name }} ({{ (int) $svc->stock_quantity }})</span>
+                @endforeach
+            </p>
+            <p class="mt-2">
+                <a href="{{ route('inventory.index') }}" class="font-semibold text-amber-950 underline decoration-amber-800/60 hover:text-amber-900">View inventory</a>
+            </p>
+        </div>
+    @endif
 
     <section class="crm-panel p-5">
         <form method="GET" action="{{ route('services.index') }}" class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -45,6 +59,8 @@
                         <th class="py-2 pr-3 font-medium">Category</th>
                         <th class="py-2 pr-3 font-medium">Duration</th>
                         <th class="py-2 pr-3 font-medium">Price</th>
+                        <th class="py-2 pr-3 font-medium">Stock</th>
+                        <th class="py-2 pr-3 font-medium">Track</th>
                         <th class="py-2 pr-3 font-medium">Active</th>
                         <th class="py-2 pr-3 font-medium">Staff</th>
                         <th class="py-2 pr-3 font-medium">Covered By</th>
@@ -58,6 +74,23 @@
                             <td class="py-3 pr-3">{{ $service->category ?: '—' }}</td>
                             <td class="py-3 pr-3">{{ $service->duration_minutes }} min</td>
                             <td class="py-3 pr-3">${{ number_format((float) $service->price, 2) }}</td>
+                            <td class="py-3 pr-3 text-xs text-slate-600">
+                                @if ($service->track_inventory)
+                                    {{ (int) $service->stock_quantity }}
+                                    @if ((int) $service->stock_quantity <= (int) $service->reorder_level)
+                                        <span class="ml-1 font-semibold text-amber-800">Low</span>
+                                    @endif
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td class="py-3 pr-3">
+                                @if ($service->track_inventory)
+                                    <span class="text-xs font-medium text-emerald-800">Yes</span>
+                                @else
+                                    <span class="text-xs text-slate-500">No</span>
+                                @endif
+                            </td>
                             <td class="py-3 pr-3">
                                 @if ($service->is_active)
                                     <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Yes</span>
@@ -90,7 +123,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="py-6 text-center text-slate-500">No services yet. Add your first treatment.</td>
+                            <td colspan="10" class="py-6 text-center text-slate-500">No services yet. Add your first treatment.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -108,6 +141,9 @@
                 'price' => (float) $service->price,
                 'description' => $service->description,
                 'is_active' => (bool) $service->is_active,
+                'track_inventory' => (bool) $service->track_inventory,
+                'stock_quantity' => (int) $service->stock_quantity,
+                'reorder_level' => (int) $service->reorder_level,
                 'staff_user_ids' => $service->staffUsers->pluck('id')->values()->all(),
                 'membership_ids' => $service->coveredByMemberships->pluck('id')->values()->all(),
             ];
@@ -137,7 +173,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Duration (minutes)</label>
-                        <input name="duration_minutes" type="number" min="1" value="{{ old('duration_minutes', 30) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input name="duration_minutes" type="number" min="0" value="{{ old('duration_minutes', 30) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
                         @error('duration_minutes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
@@ -145,6 +181,26 @@
                     <label class="mb-1 block text-sm font-medium">Price (USD)</label>
                     <input name="price" type="number" step="0.01" min="0" value="{{ old('price', '0.00') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
                     @error('price') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="grid gap-3 md:grid-cols-3">
+                    <div>
+                        <label class="flex items-center gap-2 text-sm font-medium">
+                            <input type="hidden" name="track_inventory" value="0">
+                            <input type="checkbox" name="track_inventory" value="1" class="rounded border-slate-300" @checked(old('track_inventory') === '1')>
+                            Track inventory
+                        </label>
+                        @error('track_inventory') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Stock on hand</label>
+                        <input name="stock_quantity" type="number" min="0" value="{{ old('stock_quantity', 0) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        @error('stock_quantity') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Reorder at</label>
+                        <input name="reorder_level" type="number" min="0" value="{{ old('reorder_level', 5) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        @error('reorder_level') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Description</label>
@@ -230,7 +286,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Duration (minutes)</label>
-                        <input id="edit_duration_minutes" name="duration_minutes" type="number" min="1" value="{{ old('duration_minutes') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
+                        <input id="edit_duration_minutes" name="duration_minutes" type="number" min="0" value="{{ old('duration_minutes') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
                         @error('duration_minutes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
@@ -238,6 +294,23 @@
                     <label class="mb-1 block text-sm font-medium">Price (USD)</label>
                     <input id="edit_price" name="price" type="number" step="0.01" min="0" value="{{ old('price') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
                     @error('price') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="grid gap-3 md:grid-cols-3">
+                    <div>
+                        <label class="flex items-center gap-2 text-sm font-medium">
+                            <input type="hidden" name="track_inventory" value="0">
+                            <input id="edit_track_inventory" type="checkbox" name="track_inventory" value="1" class="rounded border-slate-300" @checked(old('track_inventory') === '1')>
+                            Track inventory
+                        </label>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Stock on hand</label>
+                        <input id="edit_stock_quantity" name="stock_quantity" type="number" min="0" value="{{ old('stock_quantity') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Reorder at</label>
+                        <input id="edit_reorder_level" name="reorder_level" type="number" min="0" value="{{ old('reorder_level') }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Description</label>
@@ -333,6 +406,12 @@
             document.getElementById('edit_price').value = payload.price != null ? String(payload.price) : '';
             document.getElementById('edit_description').value = payload.description || '';
             document.getElementById('edit_is_active').checked = Boolean(payload.is_active);
+            const trackInv = document.getElementById('edit_track_inventory');
+            if (trackInv) trackInv.checked = Boolean(payload.track_inventory);
+            const stockQty = document.getElementById('edit_stock_quantity');
+            if (stockQty) stockQty.value = payload.stock_quantity != null ? String(payload.stock_quantity) : '0';
+            const reorder = document.getElementById('edit_reorder_level');
+            if (reorder) reorder.value = payload.reorder_level != null ? String(payload.reorder_level) : '5';
             const staffIds = Array.isArray(payload.staff_user_ids) ? payload.staff_user_ids.map(Number) : [];
             const membershipIds = Array.isArray(payload.membership_ids) ? payload.membership_ids.map(Number) : [];
             document.querySelectorAll('.edit-staff-cb').forEach((cb) => {

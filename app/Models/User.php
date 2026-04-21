@@ -80,4 +80,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(WaitlistEntry::class, 'staff_user_id');
     }
+
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_to_user_id');
+    }
 }

@@ -314,7 +314,15 @@
 
         <section data-dashboard-panel="ctrl-messaging" class="relative crm-panel p-5">
             <h2 class="text-lg font-semibold">Email / SMS settings</h2>
-            <p class="mt-1 text-xs text-slate-500">Email settings are live now. SMS settings are stored for future gateway integration, including template toggles and lead times.</p>
+            <p class="mt-1 text-xs text-slate-500">Templates drive appointment reminders, staff-initiated follow-ups, and &ldquo;we missed you&rdquo; messages from the customer timeline. Outbound SMS uses Twilio when <code class="rounded bg-slate-100 px-1">TWILIO_*</code> is set in <code class="rounded bg-slate-100 px-1">.env</code>. Inbound email (SendGrid Inbound Parse) and inbound SMS (Twilio) append to the customer timeline when the sender matches a customer.</p>
+            @if ($clinicSettings->webhook_inbound_token)
+                <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">
+                    <p class="font-semibold text-slate-900">Inbound webhook URLs (append your secret token)</p>
+                    <p class="mt-2 break-all"><span class="font-medium">Twilio SMS:</span> <code>{{ url('/webhooks/twilio/sms?token='.urlencode($clinicSettings->webhook_inbound_token)) }}</code></p>
+                    <p class="mt-2 break-all"><span class="font-medium">SendGrid Inbound Parse:</span> <code>{{ url('/webhooks/sendgrid/inbound?token='.urlencode($clinicSettings->webhook_inbound_token)) }}</code></p>
+                    <p class="mt-2 text-slate-600">Alternatively send header <code class="rounded bg-white px-1 ring-1 ring-slate-200">X-Beautiskin-Webhook-Token: {{ $clinicSettings->webhook_inbound_token }}</code> instead of a query parameter.</p>
+                </div>
+            @endif
             <form method="POST" action="{{ route('admin.messaging-settings.update') }}" class="mt-4 space-y-4">
                 @csrf
                 @method('PATCH')
@@ -352,7 +360,33 @@
                     <label class="mb-1 block text-sm font-medium">Reminder SMS template</label>
                     <textarea name="reminder_sms_template" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ $clinicSettings->reminder_sms_template }}</textarea>
                 </div>
-                <p class="text-xs text-slate-500">Available placeholders: <code>{{ '{' }}{clinic_name}{{ '}' }}</code>, <code>{{ '{' }}{customer_name}{{ '}' }}</code>, <code>{{ '{' }}{date}{{ '}' }}</code>, <code>{{ '{' }}{start_time}{{ '}' }}</code>, <code>{{ '{' }}{end_time}{{ '}' }}</code>, <code>{{ '{' }}{staff_name}{{ '}' }}</code>, <code>{{ '{' }}{services}{{ '}' }}</code>.</p>
+                <p class="text-xs font-semibold text-slate-700">Follow-up templates (timeline &ldquo;Send using template&rdquo;)</p>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Follow-up email subject</label>
+                    <input name="followup_email_subject_template" value="{{ $clinicSettings->followup_email_subject_template }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Follow-up email body</label>
+                    <textarea name="followup_email_body_template" rows="4" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ $clinicSettings->followup_email_body_template }}</textarea>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Follow-up SMS</label>
+                    <textarea name="followup_sms_template" rows="2" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ $clinicSettings->followup_sms_template }}</textarea>
+                </div>
+                <p class="text-xs font-semibold text-slate-700">We missed you (no-show) templates</p>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">No-show email subject</label>
+                    <input name="no_show_email_subject_template" value="{{ $clinicSettings->no_show_email_subject_template }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">No-show email body</label>
+                    <textarea name="no_show_email_body_template" rows="4" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ $clinicSettings->no_show_email_body_template }}</textarea>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">No-show SMS</label>
+                    <textarea name="no_show_sms_template" rows="2" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ $clinicSettings->no_show_sms_template }}</textarea>
+                </div>
+                <p class="text-xs text-slate-500">Available placeholders: <code>{{ '{' }}{clinic_name}{{ '}' }}</code>, <code>{{ '{' }}{customer_name}{{ '}' }}</code>, <code>{{ '{' }}{first_name}{{ '}' }}</code>, <code>{{ '{' }}{last_name}{{ '}' }}</code>, <code>{{ '{' }}{date}{{ '}' }}</code>, <code>{{ '{' }}{start_time}{{ '}' }}</code>, <code>{{ '{' }}{end_time}{{ '}' }}</code>, <code>{{ '{' }}{staff_name}{{ '}' }}</code>, <code>{{ '{' }}{services}{{ '}' }}</code>. Appointment-specific fields are filled when you choose an appointment for the send (or when sending a reminder from the calendar).</p>
                 <button type="submit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Save messaging settings</button>
             </form>
             <form method="POST" action="{{ route('admin.messaging-settings.test-send') }}" class="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">

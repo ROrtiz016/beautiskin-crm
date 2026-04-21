@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\AppointmentFormLookupCache;
+use App\Support\PhoneDigits;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -52,5 +53,52 @@ class Customer extends Model
     public function waitlistEntries(): HasMany
     {
         return $this->hasMany(WaitlistEntry::class);
+    }
+
+    public function opportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(CustomerActivity::class)->latest('created_at');
+    }
+
+    public function communicationLogs(): HasMany
+    {
+        return $this->hasMany(CommunicationLog::class)->latest('created_at');
+    }
+
+    public static function findByEmailAddress(string $email): ?self
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        return static::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+    }
+
+    public static function findByInboundSmsFrom(string $from): ?self
+    {
+        $digits = PhoneDigits::normalize($from);
+        if ($digits === null) {
+            return null;
+        }
+
+        $byExact = static::query()->where('phone', $from)->first();
+        if ($byExact) {
+            return $byExact;
+        }
+
+        return static::query()->whereNotNull('phone')->get()->first(function (self $customer) use ($digits) {
+            return PhoneDigits::normalize($customer->phone) === $digits;
+        });
     }
 }

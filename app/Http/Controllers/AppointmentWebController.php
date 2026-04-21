@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\ClinicSetting;
+use App\Models\CommunicationLog;
 use App\Models\Service;
 use App\Models\WaitlistEntry;
 use App\Notifications\AppointmentReminderNotification;
+use App\Services\CommunicationRecorder;
+use App\Services\CustomerMessagingTemplateService;
 use App\Services\AppointmentPolicyEnforcer;
+use App\Support\AppointmentCancellation;
 use App\Support\AppointmentFormLookupCache;
 use App\Support\ContactMethod;
 use App\Support\LeadSource;
@@ -185,7 +189,9 @@ class AppointmentWebController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        $this->syncAppointmentServices($appointment, $validated['services']);
+        if ($appointment->status !== 'completed') {
+            $this->syncAppointmentServices($appointment, $validated['services']);
+        }
 
         return redirect()
             ->route('appointments.index', [
@@ -247,7 +253,7 @@ class AppointmentWebController extends Controller
             ->with('status', 'Appointment rescheduled successfully.');
     }
 
-    public function sendEmailReminder(Appointment $appointment): RedirectResponse
+    public function sendEmailReminder(Request $request, Appointment $appointment): RedirectResponse
     {
         $appointment->loadMissing(['customer', 'services', 'staffUser']);
 
@@ -261,6 +267,27 @@ class AppointmentWebController extends Controller
         }
 
         $appointment->customer->notify(new AppointmentReminderNotification($appointment));
+
+        $settings = ClinicSetting::current();
+        $rendered = CustomerMessagingTemplateService::render('reminder', $appointment->customer, $appointment, $settings);
+        $from = $settings->email_from_address ? (string) $settings->email_from_address : (string) config('mail.from.address');
+
+        CommunicationRecorder::recordStructured(
+            $appointment->customer,
+            CommunicationLog::CHANNEL_EMAIL,
+            CommunicationLog::DIRECTION_OUTBOUND,
+            CommunicationLog::PROVIDER_CRM,
+            null,
+            'reminder',
+            (string) ($rendered['subject'] ?? 'Appointment reminder'),
+            (string) ($rendered['email_body'] ?? ''),
+            $from,
+            (string) $appointment->customer->email,
+            'sent',
+            (int) $request->user()->id,
+            $appointment->id,
+            ['trigger' => 'appointment_reminder_email'],
+        );
 
         $appointment->update([
             'email_reminder_sent_at' => now(),
@@ -280,13 +307,9 @@ class AppointmentWebController extends Controller
             'status' => ['required', Rule::in(['booked', 'completed', 'cancelled', 'no_show'])],
         ]);
 
-        if ($validated['status'] === 'cancelled' && $appointment->status !== 'cancelled') {
-            AppointmentPolicyEnforcer::assertCanMarkCancelled($appointment);
-        }
-
-        $appointment->update([
-            'status' => $validated['status'],
-        ]);
+        $appointment->update(
+            AppointmentCancellation::attributesWhenChangingStatus($request, $appointment, $validated['status'])
+        );
 
         return redirect()
             ->route('appointments.index', [
@@ -485,7 +508,44 @@ class AppointmentWebController extends Controller
     private function appointmentsBaseQuery(Request $request): Builder
     {
         return $this->appointmentsFilteredQuery($request)
-            ->with(['customer.memberships.membership.coveredServices', 'services.service.coveredByMemberships', 'staffUser']);
+            ->with([
+                // Nested with() passes Relation (e.g. BelongsTo), not Eloquent\Builder — do not type-hint Builder.
+                'customer' => function ($query) {
+                    $query->select('id', 'first_name', 'last_name', 'email', 'phone')
+                        ->with([
+                            'memberships' => function ($memberships) {
+                                $memberships
+                                    ->select('id', 'customer_id', 'membership_id', 'start_date', 'end_date', 'status')
+                                    ->with([
+                                        'membership' => function ($membership) {
+                                            $membership->select('id', 'name')
+                                                ->with([
+                                                    'coveredServices' => function ($services) {
+                                                        $services->select('services.id');
+                                                    },
+                                                ]);
+                                        },
+                                    ]);
+                            },
+                        ]);
+                },
+                'services' => function ($query) {
+                    $query->select(
+                        'id',
+                        'appointment_id',
+                        'service_id',
+                        'service_name',
+                        'duration_minutes',
+                        'quantity',
+                        'unit_price',
+                        'line_total',
+                        'created_at',
+                        'updated_at',
+                    );
+                },
+                'staffUser:id,name',
+                'cancelledBy:id,name',
+            ]);
     }
 
     /**
@@ -610,7 +670,12 @@ class AppointmentWebController extends Controller
     private function waitlistEntriesForDate(Carbon $selectedDate): Collection
     {
         return WaitlistEntry::query()
-            ->with(['customer', 'service', 'staffUser', 'contactedBy:id,name'])
+            ->with([
+                'customer:id,first_name,last_name,email,phone',
+                'service:id,name',
+                'staffUser:id,name',
+                'contactedBy:id,name',
+            ])
             ->whereDate('preferred_date', $selectedDate->toDateString())
             ->whereIn('status', ['waiting', 'contacted'])
             ->orderBy('preferred_start_time')

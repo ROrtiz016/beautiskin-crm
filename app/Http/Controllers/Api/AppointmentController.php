@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Services\AppointmentPolicyEnforcer;
+use App\Support\AppointmentCancellation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class AppointmentController extends Controller
     public function index(): JsonResponse
     {
         $appointments = Appointment::query()
-            ->with(['customer', 'staffUser', 'customerMembership.membership', 'services.service'])
+            ->with(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name'])
             ->orderBy('scheduled_at')
             ->paginate(20);
 
@@ -80,14 +81,14 @@ class AppointmentController extends Controller
         });
 
         return response()->json(
-            $appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service']),
+            $appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name']),
             201
         );
     }
 
     public function show(Appointment $appointment): JsonResponse
     {
-        $appointment->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service']);
+        $appointment->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name']);
 
         return response()->json($appointment);
     }
@@ -103,10 +104,6 @@ class AppointmentController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        if (isset($validated['status']) && $validated['status'] === 'cancelled' && $appointment->status !== 'cancelled') {
-            AppointmentPolicyEnforcer::assertCanMarkCancelled($appointment);
-        }
-
         if (isset($validated['scheduled_at'])) {
             $newKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
             $oldKey = AppointmentPolicyEnforcer::appointmentDateKey($appointment->scheduled_at);
@@ -115,9 +112,18 @@ class AppointmentController extends Controller
             }
         }
 
+        if (isset($validated['status'])) {
+            $statusPayload = AppointmentCancellation::attributesWhenChangingStatus(
+                $request,
+                $appointment,
+                $validated['status']
+            );
+            $validated = array_merge($validated, $statusPayload);
+        }
+
         $appointment->update($validated);
 
-        return response()->json($appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services']));
+        return response()->json($appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services', 'cancelledBy:id,name']));
     }
 
     public function destroy(Appointment $appointment): JsonResponse

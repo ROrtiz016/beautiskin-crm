@@ -55,21 +55,30 @@
                 <nav class="flex flex-col gap-1.5 text-xs font-medium lg:min-w-0 lg:flex-row lg:flex-wrap lg:items-center lg:gap-1" aria-label="Main navigation">
                     <div class="flex flex-wrap items-center gap-1">
                         <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline">Daily</span>
-                        <a href="{{ route('customers.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('customers.*') }}">Customers</a>
-                        <a href="{{ route('appointments.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('appointments.*') }}">Appointments</a>
-                        <a href="{{ route('leads.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('leads.*') }}">Leads</a>
-                        <a href="{{ route('services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
-                        <a href="{{ route('memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
-                        @can('view-sales')
-                            <a href="{{ route('sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
-                        @endcan
+                        <div class="flex flex-wrap items-center gap-1 ml-4">
+                            <a href="{{ route('customers.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('customers.*') }}">Customers</a>
+                            <a href="{{ route('tasks.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('tasks.*') }}">Tasks</a>
+                            <a href="{{ route('activity.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('activity.index') }}">Activity</a>
+                            <a href="{{ route('appointments.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('appointments.*') }}">Appointments</a>
+                            <a href="{{ route('leads.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('leads.*') }}">Leads</a>
+                            <a href="{{ route('sales.pipeline.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.pipeline.*', 'sales.opportunities.*') }}">Pipeline</a>
+                            <a href="{{ route('services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
+                            <a href="{{ route('inventory.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('inventory.*') }}">Inventory</a>
+                            <a href="{{ route('memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
+                            @can('view-sales')
+                                <a href="{{ route('sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
+                            @endcan
+                        </div>
+                    
                     </div>
                     @can('access-admin-board')
                         <div class="flex flex-wrap items-center gap-1 border-t border-slate-200 pt-2 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-                            <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline">Admin</span>
-                            <a href="{{ route('admin.operations.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.operations.*') }}">Operations</a>
-                            <a href="{{ route('admin.reports.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.reports.*') }}">Reports</a>
-                            <a href="{{ route('admin.control-board') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.control-board') }}">Control board</a>
+                            <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline ml-4">Admin</span>
+                            <div class="flex flex-wrap items-center gap-1 ml-4">
+                                <a href="{{ route('admin.operations.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.operations.*') }}">Operations</a>
+                                <a href="{{ route('admin.reports.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.reports.*') }}">Reports</a>
+                                <a href="{{ route('admin.control-board') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.control-board') }}">Control board</a>
+                            </div>
                         </div>
                     @endcan
                 </nav>
@@ -77,11 +86,11 @@
                     $authUser = auth()->user();
                 @endphp
                 <div class="flex w-full min-w-0 flex-col gap-1.5 border-t border-slate-200 pt-2 text-left sm:max-w-[15rem] sm:self-end sm:text-right lg:w-auto lg:items-end lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 lg:text-right">
-                    <div class="min-w-0">
+                    <div class="min-w-0 ml-4">
                         <p class="truncate text-xs font-semibold text-slate-900" title="{{ $authUser->name }}">{{ $authUser->name }}</p>
                         <p class="truncate text-[11px] text-slate-500" title="{{ $authUser->email }}">{{ $authUser->email }}</p>
                     </div>
-                    <form method="POST" action="{{ route('logout') }}" class="inline-block shrink-0 sm:self-end lg:self-end">
+                    <form method="POST" action="{{ route('logout') }}" class="inline-block shrink-0 sm:self-end lg:self-end ml-4">
                         @csrf
                         <button
                             type="submit"

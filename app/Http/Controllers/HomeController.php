@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
+use App\Models\Service;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\LeadFunnelMetrics;
 use Carbon\Carbon;
@@ -80,7 +81,7 @@ class HomeController extends Controller
      */
     private function topSellingServices(Carbon $since, bool $includeProductCategories): Collection
     {
-        $productCategories = ['product', 'products', 'retail'];
+        $productCategories = Service::retailCategoryKeys();
 
         $query = DB::table('appointment_services')
             ->join('appointments', 'appointment_services.appointment_id', '=', 'appointments.id')

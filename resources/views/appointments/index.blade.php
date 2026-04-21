@@ -281,6 +281,11 @@
                 <p><span class="font-semibold">Membership:</span> <span id="modal_customer_membership"></span></p>
                 <p><span class="font-semibold">Services:</span> <span id="modal_services"></span></p>
                 <p><span class="font-semibold">Staff:</span> <span id="modal_staff_name"></span></p>
+                <div id="modal_cancellation_wrap" class="hidden rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-950">
+                    <p class="font-semibold text-rose-900">Cancellation</p>
+                    <p id="modal_cancellation_reason" class="mt-1 whitespace-pre-wrap"></p>
+                    <p id="modal_cancellation_meta" class="mt-1 text-rose-800/90"></p>
+                </div>
                 <p>
                     <span class="font-semibold">Arrival Confirmed:</span>
                     <span id="modal_arrival_state" class="ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"></span>
@@ -310,12 +315,23 @@
                     </button>
                 </div>
             </form>
-            <form id="emailReminderForm" method="POST" action="" class="mt-4 border-t border-slate-200 pt-4">
-                @csrf
-                <button type="submit" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                    Send email reminder
-                </button>
-            </form>
+            <div id="modal_email_reminder_section" class="mt-4 border-t border-slate-200 pt-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email reminder</p>
+                <div id="modal_email_reminder_status" class="mt-2 hidden flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-950">
+                    <span class="inline-flex size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                    <span><span class="font-semibold">Reminder sent</span> <span id="modal_email_reminder_when" class="text-emerald-900/90"></span></span>
+                </div>
+                <p id="modal_email_reminder_no_email" class="mt-2 hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    This customer has no email on file. Add an email on the customer profile before sending a reminder.
+                </p>
+                <form id="emailReminderForm" method="POST" action="" class="mt-3">
+                    @csrf
+                    <button type="submit" id="emailReminderSubmitBtn" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Send email reminder
+                    </button>
+                    <p id="modal_email_reminder_hint" class="mt-2 text-xs text-slate-500">Uses your clinic reminder template. Re-send sends another email and updates the sent time.</p>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -461,6 +477,44 @@
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeEditAppointmentModal()">Cancel</button>
                     <button class="rounded-md bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="cancelAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-md">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Cancel appointment</h2>
+                <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeCancelAppointmentModal()">✕</button>
+            </div>
+            <p class="text-sm text-slate-600">
+                <span id="cancel_modal_customer_label" class="font-medium text-slate-800"></span>
+            </p>
+            <form id="cancelAppointmentForm" method="POST" action="" class="mt-4 space-y-3">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="form_type" value="cancel">
+                <input type="hidden" name="status" value="cancelled">
+                <input type="hidden" name="cancel_appointment_action" id="cancel_appointment_action_field" value="{{ old('cancel_appointment_action') }}">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Cancellation reason <span class="text-rose-600">*</span></label>
+                    <textarea name="cancellation_reason" rows="4" class="crm-input" required placeholder="Why is this visit being cancelled?">{{ old('cancellation_reason') }}</textarea>
+                    @error('cancellation_reason') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('status') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <input type="hidden" name="sales_follow_up_needed" value="0">
+                    <label class="flex items-start gap-2 text-sm text-slate-800">
+                        <input type="checkbox" name="sales_follow_up_needed" value="1" class="mt-0.5 rounded border-slate-300" @checked(old('sales_follow_up_needed') == '1' || old('sales_follow_up_needed') === true || old('sales_follow_up_needed') === 1)>
+                        <span>Sales team should follow up with this customer</span>
+                    </label>
+                    @error('sales_follow_up_needed') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <p class="text-xs text-slate-500">Your account will be recorded as the staff member who processed this cancellation.</p>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" onclick="closeCancelAppointmentModal()">Close</button>
+                    <button type="submit" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Confirm cancellation</button>
                 </div>
             </form>
         </div>
@@ -751,6 +805,30 @@
             editAppointmentModal.classList.remove('flex');
         }
 
+        const cancelAppointmentModal = document.getElementById('cancelAppointmentModal');
+
+        function openCancelAppointmentModal(actionUrl, customerLabel = '') {
+            if (!actionUrl || !cancelAppointmentModal) return;
+            const form = document.getElementById('cancelAppointmentForm');
+            form.action = actionUrl;
+            const actionField = document.getElementById('cancel_appointment_action_field');
+            if (actionField) {
+                actionField.value = actionUrl;
+            }
+            const lbl = document.getElementById('cancel_modal_customer_label');
+            if (lbl) {
+                lbl.textContent = customerLabel ? `Customer: ${customerLabel}` : '';
+            }
+            cancelAppointmentModal.classList.remove('hidden');
+            cancelAppointmentModal.classList.add('flex');
+        }
+
+        function closeCancelAppointmentModal() {
+            if (!cancelAppointmentModal) return;
+            cancelAppointmentModal.classList.add('hidden');
+            cancelAppointmentModal.classList.remove('flex');
+        }
+
         function openWaitlistModal(dateStr = '') {
             const input = document.getElementById('waitlist_preferred_date');
             if (input) {
@@ -780,6 +858,42 @@
             staffSelect.value = button.dataset.staffUserId || '';
             document.getElementById('emailReminderForm').action = button.dataset.reminderAction || '';
 
+            const customerEmail = (button.dataset.customerEmail || '').trim();
+            const hasCustomerEmail = customerEmail !== '' && customerEmail !== '-';
+            const reminderSent = (button.dataset.emailReminderSent || '') === '1';
+            const reminderLabel = button.dataset.emailReminderLabel || '';
+            const noEmailEl = document.getElementById('modal_email_reminder_no_email');
+            const statusEl = document.getElementById('modal_email_reminder_status');
+            const whenEl = document.getElementById('modal_email_reminder_when');
+            const reminderForm = document.getElementById('emailReminderForm');
+            const reminderBtn = document.getElementById('emailReminderSubmitBtn');
+            const reminderHint = document.getElementById('modal_email_reminder_hint');
+
+            if (!hasCustomerEmail) {
+                noEmailEl.classList.remove('hidden');
+                statusEl.classList.add('hidden');
+                reminderForm.classList.add('hidden');
+                if (reminderHint) {
+                    reminderHint.classList.add('hidden');
+                }
+            } else {
+                noEmailEl.classList.add('hidden');
+                reminderForm.classList.remove('hidden');
+                if (reminderHint) {
+                    reminderHint.classList.remove('hidden');
+                }
+                if (reminderSent && reminderLabel) {
+                    statusEl.classList.remove('hidden');
+                    whenEl.textContent = 'on ' + reminderLabel + ' (clinic time)';
+                } else if (reminderSent) {
+                    statusEl.classList.remove('hidden');
+                    whenEl.textContent = '(send time not recorded)';
+                } else {
+                    statusEl.classList.add('hidden');
+                }
+                reminderBtn.textContent = reminderSent ? 'Re-send email reminder' : 'Send email reminder';
+            }
+
             const arrived = button.dataset.arrived === '1';
             const stateBadge = document.getElementById('modal_arrival_state');
             stateBadge.textContent = arrived ? 'Yes' : 'No';
@@ -792,6 +906,27 @@
             arrivalInput.value = arrived ? '0' : '1';
             arrivalBtn.textContent = arrived ? 'Mark not arrived' : 'Confirm arrival';
             arrivalBtn.className = `rounded-md px-4 py-2 text-sm font-semibold text-white ${arrived ? 'bg-slate-700 hover:bg-slate-800' : 'bg-blue-600 hover:bg-blue-700'}`;
+
+            const cancelWrap = document.getElementById('modal_cancellation_wrap');
+            const cancelRaw = button.getAttribute('data-cancellation');
+            if (cancelWrap) {
+                if (cancelRaw) {
+                    try {
+                        const c = JSON.parse(cancelRaw);
+                        cancelWrap.classList.remove('hidden');
+                        document.getElementById('modal_cancellation_reason').textContent = c.reason || 'No reason on file.';
+                        const parts = [];
+                        if (c.cancelled_by) parts.push(`Logged by ${c.cancelled_by}`);
+                        if (c.cancelled_at) parts.push(c.cancelled_at);
+                        if (c.sales_follow_up) parts.push('Sales follow-up requested');
+                        document.getElementById('modal_cancellation_meta').textContent = parts.join(' · ');
+                    } catch {
+                        cancelWrap.classList.add('hidden');
+                    }
+                } else {
+                    cancelWrap.classList.add('hidden');
+                }
+            }
 
             detailsModal.classList.remove('hidden');
             detailsModal.classList.add('flex');
@@ -880,6 +1015,10 @@
         @if ($errors->any() && old('form_type') === 'waitlist')
             waitlistModal.classList.remove('hidden');
             waitlistModal.classList.add('flex');
+        @endif
+
+        @if ($errors->any() && old('form_type') === 'cancel')
+            openCancelAppointmentModal(@json(old('cancel_appointment_action', '')));
         @endif
     </script>
 @endsection

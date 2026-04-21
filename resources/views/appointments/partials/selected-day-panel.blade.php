@@ -8,6 +8,7 @@
             default => 'bg-slate-100 text-slate-700',
         };
     };
+    $clinicTz = \App\Services\AppointmentPolicyEnforcer::clinicTimezone();
     $coverageBadge = static function ($appointment): array {
         $activeMembership = optional($appointment->customer)->memberships
             ?->first(fn ($membership) => $membership->status === 'active' && (! $membership->end_date || $membership->end_date->isFuture()));
@@ -60,6 +61,19 @@
             $membershipName = $activeMembership?->membership?->name;
             $notesPreview = trim((string) $appointment->notes);
             $coverage = $coverageBadge($appointment);
+            $cancellationAttr = '';
+            if ($appointment->status === 'cancelled') {
+                $cancellationAttr = json_encode([
+                    'reason' => $appointment->cancellation_reason,
+                    'cancelled_by' => $appointment->cancelledBy?->name,
+                    'cancelled_at' => $appointment->cancelled_at
+                        ? $appointment->cancelled_at->copy()->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                        : null,
+                    'sales_follow_up' => (bool) $appointment->sales_follow_up_needed,
+                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+            }
+            $reminderSentAt = $appointment->email_reminder_sent_at;
+            $reminderSentLabel = $reminderSentAt ? $reminderSentAt->copy()->timezone($clinicTz)->format('M j, Y g:i A') : '';
         @endphp
         <div class="rounded-lg border border-slate-300/90 bg-slate-50/40 px-3 py-3 shadow-sm">
             <div class="flex items-start justify-between gap-3">
@@ -84,18 +98,30 @@
                     data-staff-action="{{ route('appointments.staff.update', $appointment) }}"
                     data-reschedule-action="{{ route('appointments.reschedule', $appointment) }}"
                     data-reminder-action="{{ route('appointments.reminders.email', $appointment) }}"
+                    data-email-reminder-sent="{{ $reminderSentAt ? '1' : '0' }}"
+                    data-email-reminder-label="{{ $reminderSentLabel }}"
                     data-update-action="{{ route('appointments.update', $appointment) }}"
                     data-status-action="{{ route('appointments.status.update', $appointment) }}"
                     data-scheduled-at="{{ optional($appointment->scheduled_at)->format('Y-m-d\TH:i') }}"
                     data-ends-at="{{ optional($appointment->ends_at)->format('Y-m-d\TH:i') }}"
                     data-notes="{{ $appointment->notes }}"
                     data-status="{{ $appointment->status }}"
+                    @if ($cancellationAttr !== '')
+                        data-cancellation="{{ $cancellationAttr }}"
+                    @endif
                 >
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="font-medium">{{ optional($appointment->scheduled_at)->format('g:i A') }} - {{ optional($appointment->ends_at)->format('g:i A') ?: 'TBD' }}</p>
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $statusBadge($appointment->status) }}">
-                            {{ ucfirst(str_replace('_', ' ', $appointment->status)) }}
-                        </span>
+                        <div class="flex flex-wrap items-center justify-end gap-1.5">
+                            @if ($reminderSentAt)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200" title="Reminder email sent {{ $reminderSentLabel }}">
+                                    <span aria-hidden="true">✓</span> Reminder
+                                </span>
+                            @endif
+                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $statusBadge($appointment->status) }}">
+                                {{ ucfirst(str_replace('_', ' ', $appointment->status)) }}
+                            </span>
+                        </div>
                     </div>
                     <p class="mt-1 text-sm">{{ $appointment->customer?->first_name }} {{ $appointment->customer?->last_name }}</p>
                     <p class="text-xs text-slate-500">Staff: {{ $appointment->staffUser?->name ?: 'Unassigned' }}</p>
@@ -107,11 +133,29 @@
                     <p class="text-xs text-slate-500">
                         Services: {{ $appointment->services->pluck('service_name')->filter()->implode(', ') ?: 'No services selected' }}
                     </p>
-                    @if ($appointment->email_reminder_sent_at)
-                        <p class="mt-1 text-xs text-slate-500">Reminder emailed {{ $appointment->email_reminder_sent_at->format('Y-m-d g:i A') }}</p>
+                    @if ($reminderSentAt)
+                        <p class="mt-1 text-xs text-slate-600">
+                            <span class="font-medium text-emerald-800">Reminder email sent</span>
+                            <span class="text-slate-500">· {{ $reminderSentLabel }} (clinic time)</span>
+                        </p>
                     @endif
                     @if ($notesPreview !== '')
                         <p class="mt-1 text-xs text-slate-500">Notes: {{ \Illuminate\Support\Str::limit($notesPreview, 100) }}</p>
+                    @endif
+                    @if ($appointment->status === 'cancelled' && $appointment->cancellation_reason)
+                        <p class="mt-1 text-xs text-slate-600">
+                            <span class="font-semibold text-slate-700">Cancellation:</span>
+                            {{ \Illuminate\Support\Str::limit($appointment->cancellation_reason, 120) }}
+                        </p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Logged by {{ $appointment->cancelledBy?->name ?: 'Unknown' }}
+                            @if ($appointment->cancelled_at)
+                                · {{ $appointment->cancelled_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                            @endif
+                            @if ($appointment->sales_follow_up_needed)
+                                · <span class="font-semibold text-amber-800">Sales follow-up</span>
+                            @endif
+                        </p>
                     @endif
                 </button>
                 <button
@@ -125,7 +169,9 @@
             <div class="mt-3 flex flex-wrap gap-2">
                 <form method="POST" action="{{ route('appointments.reminders.email', $appointment) }}">
                     @csrf
-                    <button class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Email reminder</button>
+                    <button type="submit" class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        {{ $reminderSentAt ? 'Re-send reminder' : 'Email reminder' }}
+                    </button>
                 </form>
                 @if ($appointment->status === 'booked')
                     <form method="POST" action="{{ route('appointments.status.update', $appointment) }}">
@@ -134,12 +180,13 @@
                         <input type="hidden" name="status" value="completed">
                         <button class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Complete</button>
                     </form>
-                    <form method="POST" action="{{ route('appointments.status.update', $appointment) }}">
-                        @csrf
-                        @method('PATCH')
-                        <input type="hidden" name="status" value="cancelled">
-                        <button class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Cancel</button>
-                    </form>
+                    <button
+                        type="button"
+                        class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                        onclick="openCancelAppointmentModal(@js(route('appointments.status.update', $appointment)), @js(trim(($appointment->customer?->first_name ?? '').' '.($appointment->customer?->last_name ?? ''))))"
+                    >
+                        Cancel
+                    </button>
                     <form method="POST" action="{{ route('appointments.status.update', $appointment) }}">
                         @csrf
                         @method('PATCH')

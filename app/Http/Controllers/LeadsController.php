@@ -23,7 +23,12 @@ class LeadsController extends Controller
         $filters = $this->parseLeadListFilters($request);
 
         $listQuery = WaitlistEntry::query()
-            ->with(['customer', 'service', 'staffUser:id,name,email', 'contactedBy:id,name'])
+            ->with([
+                'customer:id,first_name,last_name,email,phone',
+                'service:id,name',
+                'staffUser:id,name,email',
+                'contactedBy:id,name',
+            ])
             ->orderByDesc('preferred_date')
             ->orderByDesc('id');
         $this->applyLeadListFilters($listQuery, $filters);

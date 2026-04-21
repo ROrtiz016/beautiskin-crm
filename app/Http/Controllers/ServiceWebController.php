@@ -26,12 +26,19 @@ class ServiceWebController extends Controller
 
         $staffUsers = AppointmentFormLookupCache::staffUsers();
         $memberships = Membership::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $lowStockServices = Service::query()
+            ->lowStock()
+            ->orderBy('stock_quantity')
+            ->orderBy('name')
+            ->limit(12)
+            ->get();
 
         return view('services.index', [
             'services' => $services,
             'staffUsers' => $staffUsers,
             'memberships' => $memberships,
             'search' => $search,
+            'lowStockServices' => $lowStockServices,
         ]);
     }
 
@@ -84,9 +91,12 @@ class ServiceWebController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:255'],
-            'duration_minutes' => ['required', 'integer', 'min:1'],
+            'duration_minutes' => ['required', 'integer', 'min:0'],
             'price' => ['required', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
+            'track_inventory' => ['sometimes', 'boolean'],
+            'stock_quantity' => ['nullable', 'integer', 'min:0'],
+            'reorder_level' => ['nullable', 'integer', 'min:0'],
             'staff_user_ids' => ['nullable', 'array'],
             'staff_user_ids.*' => ['integer', 'exists:users,id'],
             'membership_ids' => ['nullable', 'array'],
@@ -96,6 +106,8 @@ class ServiceWebController extends Controller
         $staffUserIds = array_values(array_unique(array_map('intval', $validated['staff_user_ids'] ?? [])));
         $membershipIds = array_values(array_unique(array_map('intval', $validated['membership_ids'] ?? [])));
 
+        $trackInventory = $request->boolean('track_inventory');
+
         return [
             'attributes' => [
                 'name' => $validated['name'],
@@ -104,6 +116,9 @@ class ServiceWebController extends Controller
                 'price' => number_format((float) $validated['price'], 2, '.', ''),
                 'description' => $validated['description'] ?? null,
                 'is_active' => $request->boolean('is_active'),
+                'track_inventory' => $trackInventory,
+                'stock_quantity' => max(0, (int) ($validated['stock_quantity'] ?? 0)),
+                'reorder_level' => max(0, (int) ($validated['reorder_level'] ?? 5)),
             ],
             'staff_user_ids' => $staffUserIds,
             'membership_ids' => $membershipIds,

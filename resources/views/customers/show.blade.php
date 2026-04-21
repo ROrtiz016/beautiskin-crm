@@ -99,14 +99,13 @@
                                     Mark completed
                                 </button>
                             </form>
-                            <form method="POST" action="{{ route('customers.appointments.status', [$customer, $nextAppointment]) }}">
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="status" value="cancelled">
-                                <button class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
-                                    Mark cancelled
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                                onclick="openCustomerCancelAppointmentModal(@js(route('customers.appointments.status', [$customer, $nextAppointment])))"
+                            >
+                                Mark cancelled
+                            </button>
                         </div>
                     </div>
                 @else
@@ -163,14 +162,13 @@
                                     Mark completed
                                 </button>
                             </form>
-                            <form method="POST" action="{{ route('customers.appointments.status', [$customer, $appointment]) }}">
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="status" value="cancelled">
-                                <button class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
-                                    Mark cancelled
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                                onclick="openCustomerCancelAppointmentModal(@js(route('customers.appointments.status', [$customer, $appointment])))"
+                            >
+                                Mark cancelled
+                            </button>
                         </div>
                     </div>
                 @empty
@@ -179,6 +177,122 @@
             </div>
         </section>
     </div>
+
+    <section class="mb-6 crm-panel p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold">Sales opportunities</h2>
+                <p class="mt-1 text-xs text-slate-500">Pipeline deals linked to this customer (most recently updated first).</p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+                <a href="{{ route('sales.pipeline.index', ['customer_id' => $customer->id]) }}" class="crm-btn-secondary text-sm">View in pipeline</a>
+                <a href="{{ route('tasks.index', ['customer_id' => $customer->id, 'view' => 'all_pending']) }}" class="crm-btn-secondary text-sm">Tasks</a>
+            </div>
+        </div>
+        <div class="mt-4 space-y-2">
+            @php $oppLabels = \App\Models\Opportunity::stageLabels(); @endphp
+            @forelse ($customer->opportunities as $opp)
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm">
+                    <div class="min-w-0">
+                        <p class="font-medium text-slate-900">{{ $opp->title }}</p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            <span class="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200">{{ $oppLabels[$opp->stage] ?? $opp->stage }}</span>
+                            <span class="ml-1 tabular-nums">${{ number_format((float) $opp->amount, 2) }}</span>
+                            @if ($opp->expected_close_date)
+                                · Close {{ $opp->expected_close_date->format('M j, Y') }}
+                            @endif
+                            @if ($opp->owner)
+                                · {{ $opp->owner->name }}
+                            @endif
+                        </p>
+                    </div>
+                </div>
+            @empty
+                <p class="text-sm text-slate-500">No opportunities yet. Add one from the pipeline.</p>
+            @endforelse
+        </div>
+    </section>
+
+    <section class="mb-6 crm-panel p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold">Tasks &amp; follow-ups</h2>
+                <p class="mt-1 text-xs text-slate-500">Open and recent tasks for this customer.</p>
+            </div>
+            <a href="{{ route('tasks.index', ['customer_id' => $customer->id, 'view' => 'all_pending']) }}" class="crm-btn-secondary text-sm shrink-0">Open task queue</a>
+        </div>
+        <div class="mt-4 space-y-2">
+            @php $taskKinds = \App\Models\Task::kindLabels(); @endphp
+            @forelse ($customer->tasks as $task)
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm">
+                    <div class="min-w-0">
+                        <p class="font-medium text-slate-900">{{ $task->title }}</p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            <span class="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200">{{ ucfirst($task->status) }}</span>
+                            <span class="ml-1">{{ $taskKinds[$task->kind] ?? $task->kind }}</span>
+                            · Due {{ $task->due_at->timezone(\App\Services\AppointmentPolicyEnforcer::clinicTimezone())->format('M j, Y g:i A') }}
+                            @if ($task->assignedTo)
+                                · {{ $task->assignedTo->name }}
+                            @endif
+                        </p>
+                    </div>
+                </div>
+            @empty
+                <p class="text-sm text-slate-500">No tasks yet. Create one from the task queue.</p>
+            @endforelse
+        </div>
+    </section>
+
+    <section class="mb-6 crm-panel p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold">Activity timeline</h2>
+                <p class="mt-1 text-xs text-slate-500">Notes, tasks, appointments, payments, communications, and pipeline updates (preview — newest first).</p>
+            </div>
+            <a href="{{ route('customers.timeline.show', $customer) }}" class="crm-btn-secondary shrink-0 text-sm">Full timeline</a>
+        </div>
+        <form method="POST" action="{{ route('customers.timeline-notes.store', $customer) }}" class="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+            @csrf
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Add note</label>
+            <textarea name="summary" rows="2" class="crm-input" placeholder="Log a call, outcome, or next step for the team." required>{{ old('summary') }}</textarea>
+            @error('summary') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+            <button type="submit" class="crm-btn-primary text-sm">Save to timeline</button>
+        </form>
+        <form method="POST" action="{{ route('customers.communications.store', $customer) }}" class="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+            @csrf
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick log — call / email / SMS</p>
+            <div class="flex flex-wrap gap-2">
+                <select name="channel" class="crm-input max-w-[11rem] text-sm" required>
+                    <option value="call">Phone call</option>
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                </select>
+                <input type="text" name="summary" class="crm-input min-w-0 flex-1 text-sm" placeholder="Short summary…" required>
+                <button type="submit" class="crm-btn-secondary text-sm">Log</button>
+            </div>
+            @error('channel') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+            @error('summary') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+        </form>
+        <ul class="mt-4 space-y-3 border-t border-slate-200 pt-4">
+            @php
+                $activityCategoryLabels = \App\Models\CustomerActivity::categoryLabels();
+            @endphp
+            @forelse ($customer->activities as $activity)
+                <li class="text-sm">
+                    <p class="text-xs text-slate-500">
+                        {{ $activity->created_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                        @if ($activity->user)
+                            · {{ $activity->user->name }}
+                        @endif
+                        · <span class="font-semibold text-slate-700">{{ $activityCategoryLabels[$activity->category] ?? ucfirst(str_replace('_', ' ', (string) $activity->event_type)) }}</span>
+                    </p>
+                    <p class="mt-1 whitespace-pre-wrap text-slate-800">{{ $activity->summary }}</p>
+                </li>
+            @empty
+                <li class="text-sm text-slate-500">No activity yet.</li>
+            @endforelse
+        </ul>
+    </section>
 
     <div id="contactEditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
         <div class="crm-modal max-w-md">
@@ -232,6 +346,48 @@
                     <p class="mt-1 text-xs text-slate-500">
                         Services: {{ $appointment->services->pluck('service_name')->filter()->implode(', ') ?: 'No services recorded' }}
                     </p>
+                    @if ($appointment->status === 'completed' && $retailSaleServices->isNotEmpty())
+                        <form method="POST" action="{{ route('customers.appointments.retail-lines.store', [$customer, $appointment]) }}" class="mt-3 flex flex-col gap-2 rounded-md border border-pink-200/80 bg-pink-50/40 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-end">
+                            @csrf
+                            <div class="min-w-0 flex-1">
+                                <label class="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-pink-900/80">Add retail (in-room)</label>
+                                <select name="service_id" class="crm-input text-sm" required>
+                                    <option value="">Choose product…</option>
+                                    @foreach ($retailSaleServices as $rs)
+                                        <option value="{{ $rs->id }}" @selected((string) old('service_id') === (string) $rs->id)>
+                                            {{ $rs->name }}
+                                            @if ($rs->track_inventory)
+                                                ({{ (int) $rs->stock_quantity }} in stock)
+                                            @endif
+                                            — ${{ number_format((float) $rs->price, 2) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('service_id') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="w-24 shrink-0">
+                                <label class="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-pink-900/80">Qty</label>
+                                <input type="number" name="quantity" min="1" max="999" value="{{ old('quantity', 1) }}" class="crm-input text-sm" required>
+                                @error('quantity') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <button type="submit" class="crm-btn-primary shrink-0 text-xs py-2">Add line</button>
+                        </form>
+                    @endif
+                    @if ($appointment->status === 'cancelled' && $appointment->cancellation_reason)
+                        <p class="mt-2 text-xs text-slate-600">
+                            <span class="font-semibold text-slate-700">Cancellation:</span>
+                            {{ \Illuminate\Support\Str::limit($appointment->cancellation_reason, 160) }}
+                        </p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Logged by {{ $appointment->cancelledBy?->name ?: 'Unknown' }}
+                            @if ($appointment->cancelled_at)
+                                · {{ $appointment->cancelled_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                            @endif
+                            @if ($appointment->sales_follow_up_needed)
+                                · <span class="font-semibold text-amber-800">Sales follow-up</span>
+                            @endif
+                        </p>
+                    @endif
                     <div class="mt-3">
                         <button
                             type="button"
@@ -375,6 +531,44 @@
         </div>
     </div>
 
+    <div id="customerCancelAppointmentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm">
+        <div class="crm-modal max-w-md">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Cancel appointment</h2>
+                <button type="button" class="text-slate-500 hover:text-slate-800" onclick="closeCustomerCancelAppointmentModal()">✕</button>
+            </div>
+            <p class="text-sm text-slate-600">
+                Recording cancellation for <span class="font-medium text-slate-800">{{ $customer->first_name }} {{ $customer->last_name }}</span>
+            </p>
+            <form id="customerCancelAppointmentForm" method="POST" action="" class="mt-4 space-y-3">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="form_type" value="cancel_customer">
+                <input type="hidden" name="status" value="cancelled">
+                <input type="hidden" name="cancel_appointment_action" id="customer_cancel_appointment_action_field" value="{{ old('cancel_appointment_action') }}">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Cancellation reason <span class="text-rose-600">*</span></label>
+                    <textarea name="cancellation_reason" rows="4" class="crm-input" required placeholder="Why is this visit being cancelled?">{{ old('cancellation_reason') }}</textarea>
+                    @error('cancellation_reason') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('status') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <input type="hidden" name="sales_follow_up_needed" value="0">
+                    <label class="flex items-start gap-2 text-sm text-slate-800">
+                        <input type="checkbox" name="sales_follow_up_needed" value="1" class="mt-0.5 rounded border-slate-300" @checked(old('sales_follow_up_needed') == '1' || old('sales_follow_up_needed') === true || old('sales_follow_up_needed') === 1)>
+                        <span>Sales team should follow up with this customer</span>
+                    </label>
+                    @error('sales_follow_up_needed') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <p class="text-xs text-slate-500">Your account will be recorded as the staff member who processed this cancellation.</p>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" class="crm-btn-secondary" onclick="closeCustomerCancelAppointmentModal()">Close</button>
+                    <button type="submit" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Confirm cancellation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="crm-panel p-5">
             <h2 class="text-lg font-semibold">Payment History</h2>
@@ -470,7 +664,26 @@
         const updateAppointmentModal = document.getElementById('updateAppointmentModal');
         const updateAppointmentForm = document.getElementById('updateAppointmentForm');
         const contactEditModal = document.getElementById('contactEditModal');
+        const customerCancelAppointmentModal = document.getElementById('customerCancelAppointmentModal');
         const servicesOptions = @json($serviceOptions);
+
+        function openCustomerCancelAppointmentModal(actionUrl) {
+            if (!actionUrl || !customerCancelAppointmentModal) return;
+            const form = document.getElementById('customerCancelAppointmentForm');
+            form.action = actionUrl;
+            const actionField = document.getElementById('customer_cancel_appointment_action_field');
+            if (actionField) {
+                actionField.value = actionUrl;
+            }
+            customerCancelAppointmentModal.classList.remove('hidden');
+            customerCancelAppointmentModal.classList.add('flex');
+        }
+
+        function closeCustomerCancelAppointmentModal() {
+            if (!customerCancelAppointmentModal) return;
+            customerCancelAppointmentModal.classList.add('hidden');
+            customerCancelAppointmentModal.classList.remove('flex');
+        }
 
         function openAddAppointmentModal() {
             const container = document.getElementById('addServicesContainer');
@@ -566,5 +779,9 @@
             });
             container.appendChild(wrapper);
         }
+
+        @if ($errors->any() && old('form_type') === 'cancel_customer')
+            openCustomerCancelAppointmentModal(@json(old('cancel_appointment_action', '')));
+        @endif
     </script>
 @endsection

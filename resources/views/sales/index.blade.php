@@ -8,9 +8,12 @@
                 Revenue and volume for appointments scheduled in the selected range ({{ $clinicTimezone }}). New memberships count subscriptions created in the same window.
             </p>
         </div>
-        @can('access-admin-board')
-            <a href="{{ route('admin.reports.index', request()->only(['from', 'to'])) }}" class="text-sm font-semibold text-pink-700 hover:text-pink-800">Open full reports →</a>
-        @endcan
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ route('sales.pipeline.index') }}" class="text-sm font-semibold text-pink-700 hover:text-pink-800">Sales pipeline →</a>
+            @can('access-admin-board')
+                <a href="{{ route('admin.reports.index', request()->only(['from', 'to'])) }}" class="text-sm font-semibold text-pink-700 hover:text-pink-800">Open full reports →</a>
+            @endcan
+        </div>
     </div>
 
     <section class="mb-8 crm-panel p-5">

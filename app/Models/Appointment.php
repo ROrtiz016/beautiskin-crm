@@ -24,6 +24,10 @@ class Appointment extends Model
         'deposit_amount',
         'deposit_paid',
         'notes',
+        'cancellation_reason',
+        'cancelled_by_user_id',
+        'sales_follow_up_needed',
+        'cancelled_at',
     ];
 
     protected function casts(): array
@@ -36,6 +40,8 @@ class Appointment extends Model
             'total_amount' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
             'deposit_paid' => 'boolean',
+            'sales_follow_up_needed' => 'boolean',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -47,6 +53,11 @@ class Appointment extends Model
     public function staffUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_user_id');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
     }
 
     public function customerMembership(): BelongsTo
