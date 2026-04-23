@@ -324,7 +324,10 @@
     </div>
 
     <section class="mb-6 crm-panel p-5">
-        <h2 class="text-lg font-semibold">Past Appointments</h2>
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-lg font-semibold">Past Appointments</h2>
+            <a href="{{ route('quotes.index', ['customer_id' => $customer->id]) }}" class="text-xs font-semibold text-pink-700 hover:text-pink-800">Quotes for this customer →</a>
+        </div>
         <p class="mt-1 text-xs text-slate-500">Showing up to {{ number_format($appointmentsProfileDisplayLimit) }} rows by latest scheduled time (includes upcoming in that window).</p>
         <div class="mt-4 space-y-3">
             @forelse ($pastAppointments as $appointment)
@@ -345,6 +348,19 @@
                     </p>
                     <p class="mt-1 text-xs text-slate-500">
                         Services: {{ $appointment->services->pluck('service_name')->filter()->implode(', ') ?: 'No services recorded' }}
+                    </p>
+                    @php
+                        $visitTot = round((float) $appointment->total_amount, 2);
+                        $paidTot = round((float) ($appointment->payment_entries_sum_amount ?? 0), 2);
+                        $dueTot = round(max(0, $visitTot - $paidTot), 2);
+                    @endphp
+                    <p class="mt-1 text-xs text-slate-600">
+                        Visit total <span class="font-semibold">${{ number_format($visitTot, 2) }}</span>
+                        · Payments recorded <span class="font-semibold">${{ number_format($paidTot, 2) }}</span>
+                        · Balance <span class="font-semibold {{ $dueTot > 0 ? 'text-amber-800' : 'text-emerald-800' }}">${{ number_format($dueTot, 2) }}</span>
+                        @if ($appointment->quote)
+                            · <a href="{{ route('quotes.show', $appointment->quote) }}" class="text-pink-700 hover:text-pink-800">Quote #{{ $appointment->quote->id }}</a>
+                        @endif
                     </p>
                     @if ($appointment->status === 'completed' && $retailSaleServices->isNotEmpty())
                         <form method="POST" action="{{ route('customers.appointments.retail-lines.store', [$customer, $appointment]) }}" class="mt-3 flex flex-col gap-2 rounded-md border border-pink-200/80 bg-pink-50/40 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-end">

@@ -75,6 +75,11 @@ class Customer extends Model
         return $this->hasMany(CommunicationLog::class)->latest('created_at');
     }
 
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class)->latest();
+    }
+
     public static function findByEmailAddress(string $email): ?self
     {
         $email = strtolower(trim($email));

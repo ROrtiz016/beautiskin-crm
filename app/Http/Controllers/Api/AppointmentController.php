@@ -6,16 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentCancellation;
+use App\Support\AppointmentLedger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AppointmentController extends Controller
 {
     public function index(): JsonResponse
     {
         $appointments = Appointment::query()
-            ->with(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name'])
+            ->withSum('paymentEntries', 'amount')
+            ->with(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name', 'quote:id,title,status', 'paymentEntries'])
             ->orderBy('scheduled_at')
             ->paginate(20);
 
@@ -35,6 +38,12 @@ class AppointmentController extends Controller
             'services' => ['array'],
             'services.*.service_id' => ['required_with:services', 'exists:services,id'],
             'services.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'quote_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('quotes', 'id')->where(fn ($q) => $q->where('customer_id', (int) $request->input('customer_id'))),
+            ],
         ], AppointmentPolicyEnforcer::depositRulesForRequest()));
 
         $dateKey = AppointmentPolicyEnforcer::appointmentDateKey($validated['scheduled_at']);
@@ -43,11 +52,12 @@ class AppointmentController extends Controller
         $depositPaid = AppointmentPolicyEnforcer::depositPaidFromValidated($validated);
         $depositAmount = $depositPaid ? AppointmentPolicyEnforcer::defaultDepositAmount() : null;
 
-        $appointment = DB::transaction(function () use ($validated, $depositPaid, $depositAmount) {
+        $appointment = DB::transaction(function () use ($validated, $depositPaid, $depositAmount, $request) {
             $appointment = Appointment::create([
                 'customer_id' => $validated['customer_id'],
                 'staff_user_id' => $validated['staff_user_id'] ?? null,
                 'customer_membership_id' => $validated['customer_membership_id'] ?? null,
+                'quote_id' => $validated['quote_id'] ?? null,
                 'scheduled_at' => $validated['scheduled_at'],
                 'ends_at' => $validated['ends_at'] ?? null,
                 'status' => $validated['status'] ?? 'booked',
@@ -77,18 +87,20 @@ class AppointmentController extends Controller
 
             $appointment->update(['total_amount' => number_format($total, 2, '.', '')]);
 
+            AppointmentLedger::recordBookingDepositIfPaid($appointment, $depositPaid, $depositAmount, $request->user()?->id);
+
             return $appointment;
         });
 
         return response()->json(
-            $appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name']),
+            $appointment->fresh()->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name', 'quote', 'paymentEntries']),
             201
         );
     }
 
     public function show(Appointment $appointment): JsonResponse
     {
-        $appointment->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name']);
+        $appointment->load(['customer', 'staffUser', 'customerMembership.membership', 'services.service', 'cancelledBy:id,name', 'quote', 'paymentEntries']);
 
         return response()->json($appointment);
     }

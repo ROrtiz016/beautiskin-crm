@@ -281,6 +281,38 @@
                 <p><span class="font-semibold">Membership:</span> <span id="modal_customer_membership"></span></p>
                 <p><span class="font-semibold">Services:</span> <span id="modal_services"></span></p>
                 <p><span class="font-semibold">Staff:</span> <span id="modal_staff_name"></span></p>
+                <div class="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing &amp; deposits</p>
+                    <p class="mt-2 text-slate-800">
+                        Visit total <span id="modal_visit_total" class="font-semibold">$0.00</span>
+                        · Payments <span id="modal_payments_applied" class="font-semibold">$0.00</span>
+                        · Balance due <span id="modal_balance_due" class="font-semibold text-amber-800">$0.00</span>
+                    </p>
+                    <div id="modal_payment_entries" class="mt-2 max-h-36 space-y-1 overflow-y-auto text-xs text-slate-600"></div>
+                    <form id="modal_payment_entry_form" method="POST" action="" class="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
+                        @csrf
+                        <div class="sm:col-span-2">
+                            <label class="mb-0.5 block text-[11px] font-semibold text-slate-500">Type</label>
+                            <select name="entry_type" class="crm-input text-sm" required>
+                                <option value="deposit">Deposit</option>
+                                <option value="payment">Payment</option>
+                                <option value="refund">Refund (records as negative)</option>
+                                <option value="adjustment">Adjustment</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-0.5 block text-[11px] font-semibold text-slate-500">Amount</label>
+                            <input name="amount" type="number" step="0.01" min="0.01" class="crm-input text-sm" required>
+                        </div>
+                        <div>
+                            <label class="mb-0.5 block text-[11px] font-semibold text-slate-500">Note (optional)</label>
+                            <input name="note" type="text" maxlength="500" class="crm-input text-sm">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <button type="submit" class="crm-btn-primary w-full text-sm py-2">Record entry</button>
+                        </div>
+                    </form>
+                </div>
                 <div id="modal_cancellation_wrap" class="hidden rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-950">
                     <p class="font-semibold text-rose-900">Cancellation</p>
                     <p id="modal_cancellation_reason" class="mt-1 whitespace-pre-wrap"></p>
@@ -851,6 +883,53 @@
             document.getElementById('modal_customer_membership').textContent = button.dataset.customerMembership || '-';
             document.getElementById('modal_services').textContent = button.dataset.services || '-';
             document.getElementById('modal_staff_name').textContent = button.dataset.staffName || 'Unassigned';
+
+            const visitTotal = button.dataset.visitTotal || '0.00';
+            const paymentsApplied = button.dataset.paymentsApplied || '0.00';
+            const balanceDue = button.dataset.balanceDue || '0.00';
+            document.getElementById('modal_visit_total').textContent = '$' + visitTotal;
+            document.getElementById('modal_payments_applied').textContent = '$' + paymentsApplied;
+            const balEl = document.getElementById('modal_balance_due');
+            balEl.textContent = '$' + balanceDue;
+            balEl.className = 'font-semibold ' + (parseFloat(balanceDue) > 0 ? 'text-amber-800' : 'text-emerald-800');
+
+            const entriesEl = document.getElementById('modal_payment_entries');
+            entriesEl.innerHTML = '';
+            let entries = [];
+            try {
+                entries = JSON.parse(button.getAttribute('data-payment-entries') || '[]');
+            } catch {
+                entries = [];
+            }
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            if (!Array.isArray(entries) || entries.length === 0) {
+                entriesEl.innerHTML = '<p class="text-slate-400">No payment entries yet.</p>';
+            } else {
+                entries.forEach((row) => {
+                    const rowEl = document.createElement('div');
+                    rowEl.className = 'flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-1';
+                    const amt = Number(row.amount);
+                    const span = document.createElement('span');
+                    span.textContent = (row.entry_type || '') + ': $' + amt.toFixed(2) + (row.note ? ' — ' + row.note : '');
+                    const del = document.createElement('form');
+                    del.method = 'POST';
+                    del.action = '/appointment-payment-entries/' + row.id;
+                    del.className = 'shrink-0';
+                    del.innerHTML = '<input type="hidden" name="_token" value="' + csrf + '">' +
+                        '<input type="hidden" name="_method" value="DELETE">' +
+                        '<button type="submit" class="text-[11px] text-red-600 hover:text-red-800">Remove</button>';
+                    rowEl.appendChild(span);
+                    rowEl.appendChild(del);
+                    entriesEl.appendChild(rowEl);
+                });
+            }
+            const payForm = document.getElementById('modal_payment_entry_form');
+            payForm.action = button.dataset.paymentEntryStore || '';
+            payForm.reset();
+            const tokenInput = payForm.querySelector('input[name="_token"]');
+            if (tokenInput) {
+                tokenInput.value = csrf;
+            }
 
             const staffForm = document.getElementById('staffAssignForm');
             const staffSelect = document.getElementById('modal_staff_select');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
+use App\Models\AppointmentPaymentEntry;
 use App\Models\ClinicSetting;
 use App\Models\CommunicationLog;
 use App\Models\Service;
@@ -13,6 +14,7 @@ use App\Services\CustomerMessagingTemplateService;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentCancellation;
 use App\Support\AppointmentFormLookupCache;
+use App\Support\AppointmentLedger;
 use App\Support\ContactMethod;
 use App\Support\LeadSource;
 use Carbon\Carbon;
@@ -150,6 +152,7 @@ class AppointmentWebController extends Controller
         $appointment = Appointment::query()->create([
             'customer_id' => $validated['customer_id'],
             'staff_user_id' => $validated['staff_user_id'] ?? null,
+            'quote_id' => $validated['quote_id'] ?? null,
             'scheduled_at' => $validated['scheduled_at'],
             'ends_at' => $validated['ends_at'] ?? null,
             'status' => 'booked',
@@ -162,6 +165,8 @@ class AppointmentWebController extends Controller
 
         $this->syncAppointmentServices($appointment, $validated['services']);
 
+        AppointmentLedger::recordBookingDepositIfPaid($appointment, $depositPaid, $depositAmount, $request->user()?->id);
+
         return redirect()
             ->route('appointments.index', [
                 'month' => Carbon::parse($validated['scheduled_at'])->format('Y-m'),
@@ -172,6 +177,7 @@ class AppointmentWebController extends Controller
 
     public function update(Request $request, Appointment $appointment): RedirectResponse
     {
+        $request->merge(['customer_id' => $appointment->customer_id]);
         $validated = $this->validateAppointmentPayload($request);
         $this->ensureNoStaffConflict($validated, $appointment);
 
@@ -181,13 +187,17 @@ class AppointmentWebController extends Controller
             AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded($newDateKey, $appointment->id);
         }
 
-        $appointment->update([
+        $updates = [
             'customer_id' => $validated['customer_id'],
             'staff_user_id' => $validated['staff_user_id'] ?? null,
             'scheduled_at' => $validated['scheduled_at'],
             'ends_at' => $validated['ends_at'] ?? null,
             'notes' => $validated['notes'] ?? null,
-        ]);
+        ];
+        if (array_key_exists('quote_id', $validated)) {
+            $updates['quote_id'] = $validated['quote_id'];
+        }
+        $appointment->update($updates);
 
         if ($appointment->status !== 'completed') {
             $this->syncAppointmentServices($appointment, $validated['services']);
@@ -199,6 +209,49 @@ class AppointmentWebController extends Controller
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
             ->with('status', 'Appointment updated successfully.');
+    }
+
+    public function storePaymentEntry(Request $request, Appointment $appointment): RedirectResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'entry_type' => ['required', Rule::in(['deposit', 'payment', 'refund', 'adjustment'])],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $amount = (float) $validated['amount'];
+        if ($validated['entry_type'] === 'refund') {
+            $amount = -abs($amount);
+        } else {
+            $amount = abs($amount);
+        }
+
+        $appointment->paymentEntries()->create([
+            'amount' => number_format($amount, 2, '.', ''),
+            'entry_type' => $validated['entry_type'],
+            'note' => $validated['note'] ?? null,
+            'recorded_by_user_id' => $request->user()?->id,
+        ]);
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Payment recorded on this appointment.');
+    }
+
+    public function destroyPaymentEntry(AppointmentPaymentEntry $appointmentPaymentEntry): RedirectResponse
+    {
+        $appointment = $appointmentPaymentEntry->appointment;
+        $appointmentPaymentEntry->delete();
+
+        return redirect()
+            ->route('appointments.index', [
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
+            ->with('status', 'Payment entry removed.');
     }
 
     public function reschedule(Request $request, Appointment $appointment): JsonResponse|RedirectResponse
@@ -508,6 +561,7 @@ class AppointmentWebController extends Controller
     private function appointmentsBaseQuery(Request $request): Builder
     {
         return $this->appointmentsFilteredQuery($request)
+            ->withSum('paymentEntries', 'amount')
             ->with([
                 // Nested with() passes Relation (e.g. BelongsTo), not Eloquent\Builder — do not type-hint Builder.
                 'customer' => function ($query) {
@@ -545,6 +599,12 @@ class AppointmentWebController extends Controller
                 },
                 'staffUser:id,name',
                 'cancelledBy:id,name',
+                'quote:id,customer_id,title,status,total_amount',
+                'paymentEntries' => function ($query) {
+                    $query->select('id', 'appointment_id', 'amount', 'entry_type', 'note', 'created_at')
+                        ->orderBy('created_at')
+                        ->orderBy('id');
+                },
             ]);
     }
 
@@ -568,6 +628,12 @@ class AppointmentWebController extends Controller
         return $request->validate(array_merge([
             'customer_id' => ['required', 'exists:customers,id'],
             'staff_user_id' => ['nullable', 'exists:users,id'],
+            'quote_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('quotes', 'id')->where(fn ($q) => $q->where('customer_id', (int) $request->input('customer_id'))),
+            ],
             'scheduled_at' => ['required', 'date'],
             'ends_at' => ['nullable', 'date', 'after:scheduled_at'],
             'notes' => ['nullable', 'string'],

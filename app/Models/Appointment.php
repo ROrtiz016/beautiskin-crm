@@ -15,6 +15,7 @@ class Appointment extends Model
         'customer_id',
         'staff_user_id',
         'customer_membership_id',
+        'quote_id',
         'scheduled_at',
         'ends_at',
         'status',
@@ -68,5 +69,34 @@ class Appointment extends Model
     public function services(): HasMany
     {
         return $this->hasMany(AppointmentService::class);
+    }
+
+    public function quote(): BelongsTo
+    {
+        return $this->belongsTo(Quote::class);
+    }
+
+    public function paymentEntries(): HasMany
+    {
+        return $this->hasMany(AppointmentPaymentEntry::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /**
+     * Net payments applied toward this visit (signed sum: deposits/payments positive, refunds negative).
+     */
+    public function paymentsAppliedTotal(): float
+    {
+        return round((float) $this->paymentEntries()->sum('amount'), 2);
+    }
+
+    /**
+     * Amount still due after applied payments (visit line total minus ledger).
+     */
+    public function balanceDueAmount(): float
+    {
+        $visit = round((float) $this->total_amount, 2);
+        $paid = $this->paymentsAppliedTotal();
+
+        return round(max(0, $visit - $paid), 2);
     }
 }

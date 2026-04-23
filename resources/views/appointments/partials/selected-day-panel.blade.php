@@ -74,6 +74,9 @@
             }
             $reminderSentAt = $appointment->email_reminder_sent_at;
             $reminderSentLabel = $reminderSentAt ? $reminderSentAt->copy()->timezone($clinicTz)->format('M j, Y g:i A') : '';
+            $visitTotal = round((float) $appointment->total_amount, 2);
+            $paymentsApplied = round((float) ($appointment->payment_entries_sum_amount ?? 0), 2);
+            $balanceDue = round(max(0, $visitTotal - $paymentsApplied), 2);
         @endphp
         <div class="rounded-lg border border-slate-300/90 bg-slate-50/40 px-3 py-3 shadow-sm">
             <div class="flex items-start justify-between gap-3">
@@ -106,6 +109,11 @@
                     data-ends-at="{{ optional($appointment->ends_at)->format('Y-m-d\TH:i') }}"
                     data-notes="{{ $appointment->notes }}"
                     data-status="{{ $appointment->status }}"
+                    data-visit-total="{{ number_format($visitTotal, 2, '.', '') }}"
+                    data-payments-applied="{{ number_format($paymentsApplied, 2, '.', '') }}"
+                    data-balance-due="{{ number_format($balanceDue, 2, '.', '') }}"
+                    data-payment-entries='@json($appointment->paymentEntries->map(fn ($e) => ['id' => $e->id, 'amount' => (float) $e->amount, 'entry_type' => $e->entry_type, 'note' => $e->note, 'created_at' => $e->created_at?->toIso8601String()])->values())'
+                    data-payment-entry-store="{{ route('appointments.payment-entries.store', $appointment) }}"
                     @if ($cancellationAttr !== '')
                         data-cancellation="{{ $cancellationAttr }}"
                     @endif
@@ -132,6 +140,9 @@
                     </p>
                     <p class="text-xs text-slate-500">
                         Services: {{ $appointment->services->pluck('service_name')->filter()->implode(', ') ?: 'No services selected' }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-600">
+                        Visit ${{ number_format($visitTotal, 2) }} · Paid ${{ number_format($paymentsApplied, 2) }} · Due ${{ number_format($balanceDue, 2) }}
                     </p>
                     @if ($reminderSentAt)
                         <p class="mt-1 text-xs text-slate-600">

@@ -19,6 +19,8 @@ use App\Http\Controllers\CustomerTimelineNoteController;
 use App\Http\Controllers\CustomerWebController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventoryWebController;
+use App\Http\Controllers\QuoteWebController;
+use App\Http\Controllers\TreatmentPackageWebController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MembershipWebController;
 use App\Http\Controllers\OperationsDashboardController;
@@ -59,6 +61,18 @@ Route::middleware('auth')->group(function () {
     Route::resource('services', ServiceWebController::class)
         ->only(['index', 'store', 'update', 'destroy']);
     Route::get('inventory', [InventoryWebController::class, 'index'])->name('inventory.index');
+    Route::get('packages', [TreatmentPackageWebController::class, 'index'])->name('packages.index');
+    Route::post('packages', [TreatmentPackageWebController::class, 'store'])->name('packages.store');
+    Route::patch('packages/{treatmentPackage}', [TreatmentPackageWebController::class, 'update'])->name('packages.update');
+    Route::delete('packages/{treatmentPackage}', [TreatmentPackageWebController::class, 'destroy'])->name('packages.destroy');
+    Route::get('quotes', [QuoteWebController::class, 'index'])->name('quotes.index');
+    Route::post('quotes', [QuoteWebController::class, 'store'])->name('quotes.store');
+    Route::get('quotes/{quote}', [QuoteWebController::class, 'show'])->name('quotes.show');
+    Route::patch('quotes/{quote}', [QuoteWebController::class, 'update'])->name('quotes.update');
+    Route::patch('quotes/{quote}/status', [QuoteWebController::class, 'updateStatus'])->name('quotes.status.update');
+    Route::post('quotes/{quote}/lines', [QuoteWebController::class, 'storeLine'])->name('quotes.lines.store');
+    Route::delete('quote-lines/{quoteLine}', [QuoteWebController::class, 'destroyLine'])->name('quote-lines.destroy');
+    Route::post('quotes/{quote}/link-appointment', [QuoteWebController::class, 'linkAppointment'])->name('quotes.link-appointment');
     Route::resource('memberships', MembershipWebController::class)
         ->only(['index', 'store', 'update', 'destroy']);
     Route::get('appointments/day', [AppointmentWebController::class, 'dayFragment'])->name('appointments.day');
@@ -71,6 +85,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('appointments/{appointment}/status', [AppointmentWebController::class, 'updateStatus'])->name('appointments.status.update');
     Route::patch('appointments/{appointment}/arrival', [AppointmentWebController::class, 'updateArrival'])->name('appointments.arrival.update');
     Route::patch('appointments/{appointment}/staff', [AppointmentWebController::class, 'updateStaff'])->name('appointments.staff.update');
+    Route::post('appointments/{appointment}/payment-entries', [AppointmentWebController::class, 'storePaymentEntry'])->name('appointments.payment-entries.store');
+    Route::delete('appointment-payment-entries/{appointmentPaymentEntry}', [AppointmentWebController::class, 'destroyPaymentEntry'])->name('appointments.payment-entries.destroy');
     Route::post('appointments/waitlist/{waitlistEntry}/contact', [AppointmentWebController::class, 'recordWaitlistContact'])->name('appointments.waitlist.contact');
     Route::patch('appointments/waitlist/{waitlistEntry}/status', [AppointmentWebController::class, 'updateWaitlistStatus'])->name('appointments.waitlist.status.update');
     Route::patch(

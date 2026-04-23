@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Service;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentCancellation;
+use App\Support\AppointmentLedger;
 use App\Services\InventoryStockService;
 use App\Support\AppointmentFormLookupCache;
 use Carbon\Carbon;
@@ -152,7 +153,10 @@ class CustomerWebController extends Controller
     {
         $customer->load([
             'appointments' => function ($query) {
-                $query->with(['services', 'staffUser', 'cancelledBy:id,name'])
+                $query->withSum('paymentEntries', 'amount')
+                    ->with(['services', 'staffUser', 'cancelledBy:id,name', 'quote:id,title,status,total_amount', 'paymentEntries' => function ($q) {
+                        $q->orderByDesc('created_at')->limit(6);
+                    }])
                     ->latest('scheduled_at')
                     ->limit(self::CUSTOMER_PROFILE_APPOINTMENTS_LIMIT);
             },
@@ -308,6 +312,12 @@ class CustomerWebController extends Controller
             'ends_at' => ['nullable', 'date', 'after:scheduled_at'],
             'staff_user_id' => ['nullable', 'exists:users,id'],
             'notes' => ['nullable', 'string'],
+            'quote_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('quotes', 'id')->where(fn ($q) => $q->where('customer_id', $customer->id)),
+            ],
             'services' => ['array'],
             'services.*.service_id' => ['nullable', 'exists:services,id'],
             'services.*.quantity' => ['nullable', 'integer', 'min:1'],
@@ -322,6 +332,7 @@ class CustomerWebController extends Controller
         $appointment = Appointment::query()->create([
             'customer_id' => $customer->id,
             'staff_user_id' => $validated['staff_user_id'] ?? null,
+            'quote_id' => $validated['quote_id'] ?? null,
             'scheduled_at' => $validated['scheduled_at'],
             'ends_at' => $validated['ends_at'] ?? null,
             'status' => 'booked',
@@ -333,6 +344,8 @@ class CustomerWebController extends Controller
         ]);
 
         $this->syncAppointmentServices($appointment, $validated['services'] ?? []);
+
+        AppointmentLedger::recordBookingDepositIfPaid($appointment, $depositPaid, $depositAmount, $request->user()?->id);
 
         return redirect()
             ->route('customers.show', $customer)

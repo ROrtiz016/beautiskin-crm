@@ -64,6 +64,8 @@
                             <a href="{{ route('sales.pipeline.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.pipeline.*', 'sales.opportunities.*') }}">Pipeline</a>
                             <a href="{{ route('services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
                             <a href="{{ route('inventory.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('inventory.*') }}">Inventory</a>
+                            <a href="{{ route('packages.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('packages.*') }}">Packages</a>
+                            <a href="{{ route('quotes.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('quotes.*', 'quote-lines.*') }}">Quotes</a>
                             <a href="{{ route('memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
                             @can('view-sales')
                                 <a href="{{ route('sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
