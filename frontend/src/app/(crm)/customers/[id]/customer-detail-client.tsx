@@ -1,6 +1,7 @@
 "use client";
 
 import { toDatetimeLocalInput, ymd } from "@/app/(crm)/appointments/appointments-helpers";
+import { formatCountryLabel, formatUsStateLabel } from "@/lib/geo-select-options";
 import { SpaPageFrame } from "@/components/spa-page-frame";
 import { useSpaGet } from "@/hooks/use-spa-get";
 import { firstErrorMessage } from "@/lib/laravel-form-errors";
@@ -32,6 +33,33 @@ function dOnly(iso: unknown): string {
     return "—";
   }
   return iso.slice(0, 10);
+}
+
+function formatCustomerAddress(c: UnknownRec): string {
+  const lines: string[] = [];
+  const l1 = String(c.address_line1 ?? "").trim();
+  const l2 = String(c.address_line2 ?? "").trim();
+  const city = String(c.city ?? "").trim();
+  const st = String(c.state_region ?? "").trim();
+  const zip = String(c.postal_code ?? "").trim();
+  const country = String(c.country ?? "").trim();
+  if (l1) {
+    lines.push(l1);
+  }
+  if (l2) {
+    lines.push(l2);
+  }
+  const stLabel = st ? formatUsStateLabel(st) : "";
+  const cityLine = [city, stLabel].filter(Boolean).join(", ");
+  if (cityLine) {
+    lines.push(cityLine);
+  }
+  const countryLabel = country ? formatCountryLabel(country) : "";
+  const zipCountry = [zip, countryLabel].filter(Boolean).join(" ");
+  if (zipCountry) {
+    lines.push(zipCountry);
+  }
+  return lines.join("\n");
 }
 
 function staffName(a: UnknownRec): string {
@@ -875,6 +903,24 @@ export function CustomerDetailClient() {
               <p className="mt-1 font-medium text-slate-900">{money(data?.totalSpent ?? 0)}</p>
               <p className="mt-1 text-xs text-slate-500">Completed appointments (all time).</p>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">Address</h2>
+              <Link
+                href={`/customers/${id}/edit`}
+                className="text-sm font-medium text-pink-700 hover:underline"
+              >
+                Edit
+              </Link>
+            </div>
+            <p className="mt-2 whitespace-pre-line text-sm text-slate-800">
+              {(() => {
+                const t = formatCustomerAddress(c).trim();
+                return t || "—";
+              })()}
+            </p>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

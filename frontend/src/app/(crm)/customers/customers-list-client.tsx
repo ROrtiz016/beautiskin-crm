@@ -4,7 +4,7 @@ import { SpaPageFrame } from "@/components/spa-page-frame";
 import { useSpaGet } from "@/hooks/use-spa-get";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useMemo } from "react";
+import { FormEvent, useMemo, useTransition } from "react";
 
 type Row = {
   id: number;
@@ -84,9 +84,13 @@ function sortArrow(sort: string, direction: string, column: SortColumn): string 
   return sort === column ? (direction === "asc" ? " ↑" : " ↓") : "";
 }
 
+const sortHeaderButtonClass =
+  "cursor-pointer rounded text-left font-medium text-slate-600 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400";
+
 export function CustomersListClient() {
   const router = useRouter();
   const sp = useSearchParams();
+  const [isNavPending, startTransition] = useTransition();
   const search = sp.get("search") ?? "";
   const sortRaw = sp.get("sort") ?? "created_at";
   const sort = isSortColumn(sortRaw) ? sortRaw : "created_at";
@@ -95,7 +99,13 @@ export function CustomersListClient() {
 
   const apiPath = useMemo(() => spaCustomersPath(search, sort, direction, page), [search, sort, direction, page]);
 
-  const { data, error, loading } = useSpaGet<CustomersIndexPayload>(apiPath);
+  const { data, error, loading, isRefreshing } = useSpaGet<CustomersIndexPayload>(apiPath);
+
+  const pushListUrl = (href: string) => {
+    startTransition(() => {
+      router.push(href, { scroll: false });
+    });
+  };
 
   const customers = data?.customers;
   const rows = customers?.data ?? [];
@@ -105,7 +115,7 @@ export function CustomersListClient() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const q = String(fd.get("search") ?? "").trim();
-    router.push(customersPageHref({ search: q, sort, direction, page: "1" }));
+    pushListUrl(customersPageHref({ search: q, sort, direction, page: "1" }));
   };
 
   return (
@@ -127,10 +137,12 @@ export function CustomersListClient() {
         </Link>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section
+        className={`relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-opacity ${isRefreshing || isNavPending ? "opacity-60" : "opacity-100"}`}
+        aria-busy={isRefreshing || isNavPending}
+      >
         <form className="mb-4 flex flex-wrap gap-2" onSubmit={onSearchSubmit}>
           <input
-            key={apiPath}
             name="search"
             defaultValue={resolvedSearch}
             placeholder="Search by name, email, or phone"
@@ -148,29 +160,49 @@ export function CustomersListClient() {
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3">
-                      <Link href={sortColumnHref(resolvedSearch, sort, direction, "name")} className="text-slate-600 hover:text-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => pushListUrl(sortColumnHref(resolvedSearch, sort, direction, "name"))}
+                        className={sortHeaderButtonClass}
+                      >
                         Name{sortArrow(sort, direction, "name")}
-                      </Link>
+                      </button>
                     </th>
                     <th className="px-4 py-3">
-                      <Link href={sortColumnHref(resolvedSearch, sort, direction, "email")} className="text-slate-600 hover:text-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => pushListUrl(sortColumnHref(resolvedSearch, sort, direction, "email"))}
+                        className={sortHeaderButtonClass}
+                      >
                         Email{sortArrow(sort, direction, "email")}
-                      </Link>
+                      </button>
                     </th>
                     <th className="px-4 py-3">
-                      <Link href={sortColumnHref(resolvedSearch, sort, direction, "phone")} className="text-slate-600 hover:text-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => pushListUrl(sortColumnHref(resolvedSearch, sort, direction, "phone"))}
+                        className={sortHeaderButtonClass}
+                      >
                         Phone{sortArrow(sort, direction, "phone")}
-                      </Link>
+                      </button>
                     </th>
                     <th className="px-4 py-3">
-                      <Link href={sortColumnHref(resolvedSearch, sort, direction, "date_of_birth")} className="text-slate-600 hover:text-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => pushListUrl(sortColumnHref(resolvedSearch, sort, direction, "date_of_birth"))}
+                        className={sortHeaderButtonClass}
+                      >
                         DOB{sortArrow(sort, direction, "date_of_birth")}
-                      </Link>
+                      </button>
                     </th>
                     <th className="px-4 py-3">
-                      <Link href={sortColumnHref(resolvedSearch, sort, direction, "appointments_count")} className="text-slate-600 hover:text-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => pushListUrl(sortColumnHref(resolvedSearch, sort, direction, "appointments_count"))}
+                        className={sortHeaderButtonClass}
+                      >
                         Appointments{sortArrow(sort, direction, "appointments_count")}
-                      </Link>
+                      </button>
                     </th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
@@ -217,32 +249,42 @@ export function CustomersListClient() {
                 </p>
                 <div className="flex gap-2">
                   {customers.current_page > 1 ? (
-                    <Link
-                      href={customersPageHref({
-                        search: resolvedSearch,
-                        sort,
-                        direction,
-                        page: String(customers.current_page - 1),
-                      })}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        pushListUrl(
+                          customersPageHref({
+                            search: resolvedSearch,
+                            sort,
+                            direction,
+                            page: String(customers.current_page - 1),
+                          }),
+                        )
+                      }
                       className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold text-slate-800 hover:bg-slate-50"
                     >
                       Previous
-                    </Link>
+                    </button>
                   ) : (
                     <span className="rounded-md border border-slate-100 px-3 py-1.5 text-slate-400">Previous</span>
                   )}
                   {customers.current_page < customers.last_page ? (
-                    <Link
-                      href={customersPageHref({
-                        search: resolvedSearch,
-                        sort,
-                        direction,
-                        page: String(customers.current_page + 1),
-                      })}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        pushListUrl(
+                          customersPageHref({
+                            search: resolvedSearch,
+                            sort,
+                            direction,
+                            page: String(customers.current_page + 1),
+                          }),
+                        )
+                      }
                       className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold text-slate-800 hover:bg-slate-50"
                     >
                       Next
-                    </Link>
+                    </button>
                   ) : (
                     <span className="rounded-md border border-slate-100 px-3 py-1.5 text-slate-400">Next</span>
                   )}

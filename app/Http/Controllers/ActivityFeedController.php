@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Customer;
 use App\Models\CustomerActivity;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -28,7 +29,7 @@ class ActivityFeedController extends Controller
         ];
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('activity.index', $this->activityIndexPayload($request));
     }

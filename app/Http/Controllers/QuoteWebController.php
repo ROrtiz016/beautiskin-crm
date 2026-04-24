@@ -9,6 +9,7 @@ use App\Models\QuoteLine;
 use App\Models\Service;
 use App\Models\TreatmentPackage;
 use App\Services\QuoteTotalsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +17,7 @@ use Illuminate\View\View;
 
 class QuoteWebController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('quotes.index', $this->quotesIndexPayload($request));
     }
@@ -77,7 +78,7 @@ class QuoteWebController extends Controller
             ->with('status', 'Quote created. Add lines below.');
     }
 
-    public function show(Quote $quote): View
+    public function show(Quote $quote): View|JsonResponse
     {
         return view('quotes.show', $this->quoteShowPayload($quote));
     }

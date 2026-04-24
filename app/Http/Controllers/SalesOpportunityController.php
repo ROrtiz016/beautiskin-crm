@@ -10,6 +10,7 @@ use App\Support\AppointmentFormLookupCache;
 use App\Support\CustomerTimeline;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,7 @@ use Illuminate\View\View;
 
 class SalesOpportunityController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('sales.pipeline', $this->pipelineIndexPayload($request));
     }

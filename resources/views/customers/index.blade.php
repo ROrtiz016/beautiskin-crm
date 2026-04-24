@@ -5,6 +5,10 @@
     $sortArrow = static fn (string $column) => $sort === $column ? ($direction === 'asc' ? '↑' : '↓') : '';
     $storeHasErrors = $errors->any() && old('form_type') === 'store';
     $updateHasErrors = $errors->any() && old('form_type') === 'update';
+    $countryRows = json_decode(file_get_contents(resource_path('data/countries-raw.json')), true, 512, JSON_THROW_ON_ERROR);
+    usort($countryRows, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+    $usStates = config('us_states');
+    asort($usStates);
 @endphp
 
 @section('content')
@@ -89,7 +93,13 @@
                                     data-phone="{{ $customer->phone }}"
                                     data-date-of-birth="{{ $customer->date_of_birth?->format('Y-m-d') }}"
                                     data-gender="{{ $customer->gender }}"
-                                    data-notes="{{ $customer->notes }}"
+                                    data-address-line1="{{ e($customer->address_line1 ?? '') }}"
+                                    data-address-line2="{{ e($customer->address_line2 ?? '') }}"
+                                    data-city="{{ e($customer->city ?? '') }}"
+                                    data-state-region="{{ e($customer->state_region ?? '') }}"
+                                    data-postal-code="{{ e($customer->postal_code ?? '') }}"
+                                    data-country="{{ e($customer->country ?? '') }}"
+                                    data-notes="{{ e($customer->notes ?? '') }}"
                                 >
                                     Edit
                                 </button>
@@ -159,6 +169,57 @@
                         @error('gender') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <p class="text-sm font-semibold text-slate-800">Address</p>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Street line 1</label>
+                        <input name="address_line1" value="{{ old('address_line1') }}" class="crm-input" autocomplete="address-line1">
+                        @error('address_line1') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Street line 2</label>
+                        <input name="address_line2" value="{{ old('address_line2') }}" class="crm-input" autocomplete="address-line2">
+                        @error('address_line2') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="grid gap-2 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">City</label>
+                            <input name="city" value="{{ old('city') }}" class="crm-input" autocomplete="address-level2">
+                            @error('city') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">State</label>
+                            <select name="state_region" class="crm-input" autocomplete="address-level1">
+                                <option value="">—</option>
+                                @foreach ($usStates as $code => $name)
+                                    <option value="{{ $code }}" @selected(old('state_region') === $code)>{{ $name }}</option>
+                                @endforeach
+                            </select>
+                            @error('state_region') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                    <div class="grid gap-2 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Postal code</label>
+                            <input name="postal_code" value="{{ old('postal_code') }}" class="crm-input" autocomplete="postal-code">
+                            @error('postal_code') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Country</label>
+                            <select name="country" class="crm-input" autocomplete="country-name">
+                                <option value="">—</option>
+                                @foreach ($countryRows as $row)
+                                    @php
+                                        $code = $row['alpha-2'];
+                                        $label = $code === 'US' ? 'United States' : $row['name'];
+                                    @endphp
+                                    <option value="{{ $code }}" @selected(old('country', 'US') === $code)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('country') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
                     <textarea name="notes" rows="3" class="crm-input">{{ old('notes') }}</textarea>
@@ -213,6 +274,51 @@
                         <input id="edit_gender" name="gender" value="{{ old('gender') }}" class="crm-input">
                     </div>
                 </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <p class="text-sm font-semibold text-slate-800">Address</p>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Street line 1</label>
+                        <input id="edit_address_line1" name="address_line1" value="{{ old('address_line1') }}" class="crm-input" autocomplete="address-line1">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Street line 2</label>
+                        <input id="edit_address_line2" name="address_line2" value="{{ old('address_line2') }}" class="crm-input" autocomplete="address-line2">
+                    </div>
+                    <div class="grid gap-2 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">City</label>
+                            <input id="edit_city" name="city" value="{{ old('city') }}" class="crm-input" autocomplete="address-level2">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">State</label>
+                            <select id="edit_state_region" name="state_region" class="crm-input" autocomplete="address-level1">
+                                <option value="">—</option>
+                                @foreach ($usStates as $code => $name)
+                                    <option value="{{ $code }}" @selected(old('state_region') === $code)>{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid gap-2 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Postal code</label>
+                            <input id="edit_postal_code" name="postal_code" value="{{ old('postal_code') }}" class="crm-input" autocomplete="postal-code">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Country</label>
+                            <select id="edit_country" name="country" class="crm-input" autocomplete="country-name">
+                                <option value="">—</option>
+                                @foreach ($countryRows as $row)
+                                    @php
+                                        $code = $row['alpha-2'];
+                                        $label = $code === 'US' ? 'United States' : $row['name'];
+                                    @endphp
+                                    <option value="{{ $code }}" @selected(old('country') === $code)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">Notes</label>
                     <textarea id="edit_notes" name="notes" rows="3" class="crm-input">{{ old('notes') }}</textarea>
@@ -253,6 +359,12 @@
             document.getElementById('edit_phone').value = button.dataset.phone || '';
             document.getElementById('edit_date_of_birth').value = button.dataset.dateOfBirth || '';
             document.getElementById('edit_gender').value = button.dataset.gender || '';
+            document.getElementById('edit_address_line1').value = button.dataset.addressLine1 || '';
+            document.getElementById('edit_address_line2').value = button.dataset.addressLine2 || '';
+            document.getElementById('edit_city').value = button.dataset.city || '';
+            document.getElementById('edit_state_region').value = button.dataset.stateRegion || '';
+            document.getElementById('edit_postal_code').value = button.dataset.postalCode || '';
+            document.getElementById('edit_country').value = button.dataset.country || '';
             document.getElementById('edit_notes').value = button.dataset.notes || '';
 
             editModal.classList.remove('hidden');

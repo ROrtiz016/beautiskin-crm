@@ -21,6 +21,12 @@ class Customer extends Model
         'phone',
         'date_of_birth',
         'gender',
+        'address_line1',
+        'address_line2',
+        'city',
+        'state_region',
+        'postal_code',
+        'country',
         'notes',
         'gdpr_deleted_at',
     ];

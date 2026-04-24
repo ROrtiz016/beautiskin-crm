@@ -1,5 +1,6 @@
 "use client";
 
+import { CountrySelect, UsStateSelect } from "@/app/(crm)/customers/customer-geo-selects";
 import { fieldErrors, firstErrorMessage } from "@/lib/laravel-form-errors";
 import { spaFetch } from "@/lib/spa-fetch";
 import Link from "next/link";
@@ -14,6 +15,12 @@ type CustomerForm = {
   phone: string | null;
   date_of_birth: string | null;
   gender: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state_region: string | null;
+  postal_code: string | null;
+  country: string | null;
   notes: string | null;
 };
 
@@ -87,6 +94,12 @@ export default function CustomerEditPage() {
           phone: form.phone || null,
           date_of_birth: form.date_of_birth || null,
           gender: form.gender || null,
+          address_line1: form.address_line1 || null,
+          address_line2: form.address_line2 || null,
+          city: form.city || null,
+          state_region: form.state_region || null,
+          postal_code: form.postal_code || null,
+          country: form.country || null,
           notes: form.notes || null,
         }),
       });
@@ -204,12 +217,85 @@ export default function CustomerEditPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-800">Gender</label>
-            <input
+            <select
               value={form.gender ?? ""}
               onChange={(ev) => setForm({ ...form, gender: ev.target.value || null })}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">—</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
             {fieldErr.gender ? <p className="mt-1 text-xs text-rose-600">{fieldErr.gender}</p> : null}
+          </div>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <p className="text-sm font-semibold text-slate-800">Address</p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-800">Street line 1</label>
+              <input
+                value={form.address_line1 ?? ""}
+                onChange={(ev) => setForm({ ...form, address_line1: ev.target.value || null })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                autoComplete="address-line1"
+              />
+              {fieldErr.address_line1 ? (
+                <p className="mt-1 text-xs text-rose-600">{fieldErr.address_line1}</p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-800">Street line 2</label>
+              <input
+                value={form.address_line2 ?? ""}
+                onChange={(ev) => setForm({ ...form, address_line2: ev.target.value || null })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                autoComplete="address-line2"
+              />
+              {fieldErr.address_line2 ? (
+                <p className="mt-1 text-xs text-rose-600">{fieldErr.address_line2}</p>
+              ) : null}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-800">City</label>
+                <input
+                  value={form.city ?? ""}
+                  onChange={(ev) => setForm({ ...form, city: ev.target.value || null })}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  autoComplete="address-level2"
+                />
+                {fieldErr.city ? <p className="mt-1 text-xs text-rose-600">{fieldErr.city}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-800">State</label>
+                <UsStateSelect
+                  value={form.state_region}
+                  onChange={(next) => setForm({ ...form, state_region: next })}
+                  error={fieldErr.state_region}
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-800">Postal code</label>
+                <input
+                  value={form.postal_code ?? ""}
+                  onChange={(ev) => setForm({ ...form, postal_code: ev.target.value || null })}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  autoComplete="postal-code"
+                />
+                {fieldErr.postal_code ? (
+                  <p className="mt-1 text-xs text-rose-600">{fieldErr.postal_code}</p>
+                ) : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-800">Country</label>
+                <CountrySelect
+                  value={form.country}
+                  onChange={(next) => setForm({ ...form, country: next })}
+                  error={fieldErr.country}
+                />
+              </div>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-800">Notes</label>

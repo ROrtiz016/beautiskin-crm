@@ -16,7 +16,7 @@ use Illuminate\View\View;
 
 class OperationsDashboardController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('admin.operations-dashboard', $this->operationsIndexPayload($request));
     }

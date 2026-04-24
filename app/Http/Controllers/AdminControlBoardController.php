@@ -99,7 +99,7 @@ class AdminControlBoardController extends Controller
         'backup' => 'Backup',
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('admin.control-board', $this->controlBoardPayload($request));
     }
@@ -1002,6 +1002,12 @@ class AdminControlBoardController extends Controller
                 'phone' => null,
                 'date_of_birth' => null,
                 'gender' => null,
+                'address_line1' => null,
+                'address_line2' => null,
+                'city' => null,
+                'state_region' => null,
+                'postal_code' => null,
+                'country' => null,
                 'notes' => 'Personal data removed via GDPR delete workflow on '.now()->toDateTimeString(),
                 'gdpr_deleted_at' => now(),
             ]);

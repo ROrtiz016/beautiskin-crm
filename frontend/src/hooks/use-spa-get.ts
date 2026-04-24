@@ -1,35 +1,81 @@
 "use client";
 
 import { spaFetch } from "@/lib/spa-fetch";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useSpaGet<T>(path: string): { data: T | null; error: string | null; loading: boolean; reload: () => void } {
+export type UseSpaGetResult<T> = {
+  data: T | null;
+  error: string | null;
+  /** True only while there is no data yet (initial load). Pagination/filter refetches keep showing previous data. */
+  loading: boolean;
+  /** True while a refetch is in flight and stale data is still shown. */
+  isRefreshing: boolean;
+  reload: () => void;
+};
+
+export function useSpaGet<T>(path: string): UseSpaGetResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await spaFetch(path);
-      if (!res.ok) {
-        setError(`${res.status} ${res.statusText}`);
-        setData(null);
-        return;
-      }
-      setData((await res.json()) as T);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [path]);
+  const [isFetching, setIsFetching] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
+  const fetchGeneration = useRef(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const ac = new AbortController();
+    const myGen = ++fetchGeneration.current;
+    let cancelled = false;
 
-  return { data, error, loading, reload: load };
+    setIsFetching(true);
+    setError(null);
+
+    const finishFetching = () => {
+      if (fetchGeneration.current === myGen) {
+        setIsFetching(false);
+      }
+    };
+
+    (async () => {
+      try {
+        const res = await spaFetch(path, { signal: ac.signal });
+        if (cancelled) {
+          return;
+        }
+        if (!res.ok) {
+          setError(`${res.status} ${res.statusText}`);
+          setData(null);
+          return;
+        }
+        const json = (await res.json()) as T;
+        if (cancelled) {
+          return;
+        }
+        setData(json);
+      } catch (e) {
+        if (cancelled) {
+          return;
+        }
+        if (e instanceof DOMException && e.name === "AbortError") {
+          return;
+        }
+        setError(e instanceof Error ? e.message : "Request failed");
+        setData(null);
+      } finally {
+        finishFetching();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [path, reloadTick]);
+
+  const reload = useCallback(() => {
+    setReloadTick((n) => n + 1);
+  }, []);
+
+  const loading = data === null && error === null && isFetching;
+  const isRefreshing = isFetching && data !== null;
+
+  return { data, error, loading, isRefreshing, reload };
 }

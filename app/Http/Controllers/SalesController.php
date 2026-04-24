@@ -7,13 +7,14 @@ use App\Models\AppointmentService;
 use App\Models\CustomerMembership;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\ReportDateRange;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class SalesController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('sales.index', $this->salesIndexPayload($request));
     }

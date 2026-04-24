@@ -9,6 +9,7 @@ use App\Models\WaitlistEntry;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\ReportDateRange;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -16,7 +17,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportingController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('admin.reports', $this->reportsIndexPayload($request));
     }

@@ -7,8 +7,9 @@ import { spaFetch } from "@/lib/spa-fetch";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CustomerFilterCombobox } from "./customer-filter-combobox";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import {
+  formatMonthYearLabel,
   formatTimeRange,
   shiftMonth,
   statusBadgeClass,
@@ -111,6 +112,60 @@ function relServiceLinesForEdit(appt: Record<string, unknown>): { service_id: nu
       quantity: Math.max(1, Math.floor(Number(row.quantity ?? 1))),
     }))
     .filter((l) => l.service_id > 0);
+}
+
+function AppointmentDetailBlock({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
+  const baseId = useId();
+  const triggerId = `${baseId}-trigger`;
+  const panelId = `${baseId}-panel`;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3">
+      {/* Controlled expand/collapse (not native <details>) so grid-rows can animate on close; browsers drop [open] before CSS can run. */}
+      <button
+        type="button"
+        id={triggerId}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded px-0.5 py-1 -mx-0.5 text-left text-xs font-semibold text-slate-700 outline-none transition-colors duration-200 hover:bg-slate-100/80 focus-visible:ring-2 focus-visible:ring-pink-400"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block">{title}</span>
+          {subtitle ? (
+            <span className="mt-0.5 block text-[11px] font-normal text-slate-500">{subtitle}</span>
+          ) : null}
+        </span>
+        <span
+          className={`shrink-0 text-[10px] text-slate-400 transition-transform duration-300 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          ▼
+        </span>
+      </button>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={triggerId}
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden" {...(!open ? { inert: true } : {})}>
+          <div className="mt-2">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DayAppointmentCard({
@@ -480,10 +535,11 @@ function DayAppointmentCard({
       </div>
 
       {status !== "completed" ? (
-        <div className="mt-3 border-t border-slate-200 pt-3">
-          <p className="text-xs font-semibold text-slate-700">Service lines</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Edit booked services and totals; payments are unchanged until you save.</p>
-          <div className="mt-2 space-y-2">
+        <AppointmentDetailBlock
+          title="Service lines"
+          subtitle="Edit booked services and totals; payments are unchanged until you save."
+        >
+          <div className="space-y-2">
             {svcLines.map((row, idx) => (
               <div key={idx} className="flex flex-wrap gap-2">
                 <select
@@ -526,7 +582,7 @@ function DayAppointmentCard({
             ))}
             <button
               type="button"
-              className="text-xs text-pink-700 hover:underline"
+              className="mr-2 text-xs text-pink-700 hover:underline"
               onClick={() => setSvcLines([...svcLines, { service_id: "", quantity: "1" }])}
             >
               + Add line
@@ -540,18 +596,20 @@ function DayAppointmentCard({
               {busy === "services" ? "Saving…" : "Save services"}
             </button>
           </div>
-        </div>
+        </AppointmentDetailBlock>
       ) : (
-        <p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">Completed visits: service lines are locked.</p>
+        <AppointmentDetailBlock title="Service lines" subtitle="Completed visits: lines are locked.">
+          <p className="text-xs text-slate-500">Service lines cannot be edited for completed visits.</p>
+        </AppointmentDetailBlock>
       )}
 
-      <div className="mt-3 border-t border-slate-200 pt-3">
-        <label className="text-xs font-medium text-slate-700">Notes</label>
+      <AppointmentDetailBlock title="Notes">
         <textarea
           rows={2}
-          className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-xs"
+          className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
           value={notesDraft}
           onChange={(ev) => setNotesDraft(ev.target.value)}
+          aria-label="Appointment notes"
         />
         <button
           type="button"
@@ -561,67 +619,75 @@ function DayAppointmentCard({
         >
           Save notes
         </button>
-      </div>
+      </AppointmentDetailBlock>
 
-      <form className="mt-3 space-y-2 border-t border-slate-200 pt-3" onSubmit={submitPayment}>
-        <p className="text-xs font-semibold text-slate-700">Record payment</p>
-        <div className="flex flex-wrap gap-2">
+      <AppointmentDetailBlock title="Record payment" subtitle="Add a payment, deposit, refund, or adjustment.">
+        <form className="space-y-2" onSubmit={submitPayment}>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Amount"
+              className="w-24 rounded border border-slate-300 px-2 py-1 text-xs"
+              value={payAmount}
+              onChange={(ev) => setPayAmount(ev.target.value)}
+            />
+            <select
+              className="rounded border border-slate-300 px-1 py-1 text-xs"
+              value={payType}
+              onChange={(ev) => setPayType(ev.target.value as typeof payType)}
+            >
+              <option value="payment">Payment</option>
+              <option value="deposit">Deposit</option>
+              <option value="refund">Refund</option>
+              <option value="adjustment">Adjustment</option>
+            </select>
+          </div>
           <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            placeholder="Amount"
-            className="w-24 rounded border border-slate-300 px-2 py-1 text-xs"
-            value={payAmount}
-            onChange={(ev) => setPayAmount(ev.target.value)}
+            type="text"
+            placeholder="Note (optional)"
+            className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+            value={payNote}
+            onChange={(ev) => setPayNote(ev.target.value)}
           />
-          <select
-            className="rounded border border-slate-300 px-1 py-1 text-xs"
-            value={payType}
-            onChange={(ev) => setPayType(ev.target.value as typeof payType)}
+          <button
+            type="submit"
+            disabled={busy !== null}
+            className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
           >
-            <option value="payment">Payment</option>
-            <option value="deposit">Deposit</option>
-            <option value="refund">Refund</option>
-            <option value="adjustment">Adjustment</option>
-          </select>
-        </div>
-        <input
-          type="text"
-          placeholder="Note (optional)"
-          className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
-          value={payNote}
-          onChange={(ev) => setPayNote(ev.target.value)}
-        />
-        <button
-          type="submit"
-          disabled={busy !== null}
-          className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
-        >
-          {busy === "pay" ? "Saving…" : "Add payment line"}
-        </button>
-      </form>
+            {busy === "pay" ? "Saving…" : "Add payment line"}
+          </button>
+        </form>
+      </AppointmentDetailBlock>
 
-      {payments.length ? (
-        <ul className="mt-2 space-y-1 text-xs text-slate-600">
-          {payments.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-2">
-              <span>
-                {p.entry_type} ${Number(p.amount).toFixed(2)}
-                {p.note ? ` — ${p.note}` : ""}
-              </span>
-              <button
-                type="button"
-                className="text-rose-600 hover:underline"
-                disabled={busy !== null}
-                onClick={() => void deletePaymentEntry(p.id)}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <AppointmentDetailBlock
+        title={payments.length ? `Payment lines (${payments.length})` : "Payment lines"}
+        subtitle={payments.length ? "Recorded payment entries for this visit." : "No entries yet."}
+      >
+        {payments.length ? (
+          <ul className="space-y-1 text-xs text-slate-600">
+            {payments.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2">
+                <span>
+                  {p.entry_type} ${Number(p.amount).toFixed(2)}
+                  {p.note ? ` — ${p.note}` : ""}
+                </span>
+                <button
+                  type="button"
+                  className="text-rose-600 hover:underline"
+                  disabled={busy !== null}
+                  onClick={() => void deletePaymentEntry(p.id)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-slate-500">No payment lines recorded yet.</p>
+        )}
+      </AppointmentDetailBlock>
 
       {cancelOpen ? (
         <form className="mt-3 space-y-2 rounded-md border border-rose-200 bg-rose-50/50 p-3" onSubmit={submitCancel}>
@@ -978,7 +1044,7 @@ export function AppointmentsClient() {
                 ← Prev month
               </Link>
               <span className="text-slate-700">
-                Month: <strong>{ym}</strong>
+                Month: <strong>{ym ? formatMonthYearLabel(ym) : ""}</strong>
               </span>
               <Link
                 href={mergeHref(sp, { month: shiftMonth(ym, 1) })}

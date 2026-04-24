@@ -6,13 +6,14 @@ use App\Models\Membership;
 use App\Models\Service;
 use App\Support\AppointmentFormLookupCache;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ServiceWebController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('services.index', $this->servicesIndexPayload($request));
     }

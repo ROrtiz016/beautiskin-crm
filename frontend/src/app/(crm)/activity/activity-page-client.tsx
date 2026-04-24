@@ -1,10 +1,11 @@
 "use client";
 
 import { SpaPageFrame } from "@/components/spa-page-frame";
+import { useAuth } from "@/context/auth-context";
 import { useSpaGet } from "@/hooks/use-spa-get";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type UnknownRec = Record<string, unknown>;
 
@@ -215,10 +216,39 @@ function ActivityPageInner() {
   );
 }
 
+function ActivityAdminGate({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    if (!user?.can.access_admin_board) {
+      router.replace("/");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-slate-600">Loading…</div>;
+  }
+  if (!user?.can.access_admin_board) {
+    return (
+      <div className="p-6 text-sm text-slate-600">
+        You do not have access to the activity feed. Redirecting…
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export function ActivityPageClient() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-600">Loading activity…</div>}>
-      <ActivityPageInner />
-    </Suspense>
+    <ActivityAdminGate>
+      <Suspense fallback={<div className="p-6 text-sm text-slate-600">Loading activity…</div>}>
+        <ActivityPageInner />
+      </Suspense>
+    </ActivityAdminGate>
   );
 }

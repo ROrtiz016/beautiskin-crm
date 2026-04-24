@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Membership;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MembershipWebController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('memberships.index', $this->membershipsIndexPayload($request));
     }

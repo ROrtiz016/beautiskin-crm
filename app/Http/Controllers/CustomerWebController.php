@@ -12,7 +12,9 @@ use App\Support\AppointmentCancellation;
 use App\Support\AppointmentLedger;
 use App\Services\InventoryStockService;
 use App\Support\AppointmentFormLookupCache;
+use App\Support\CustomerGeo;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +28,7 @@ class CustomerWebController extends Controller
 
     private const CUSTOMER_PAYMENT_HISTORY_LIMIT = 120;
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('customers.index', $this->customersIndexPayload($request));
     }
@@ -89,8 +91,18 @@ class CustomerWebController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'string', 'max:30'],
+            'address_line1' => ['nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:120'],
+            'state_region' => ['nullable', 'string', 'max:120'],
+            'postal_code' => ['nullable', 'string', 'max:30'],
+            'country' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (array_key_exists('country', $validated)) {
+            $validated['country'] = CustomerGeo::normalizeCountry($validated['country'] ?? null);
+        }
 
         Customer::create($validated);
 
@@ -99,7 +111,7 @@ class CustomerWebController extends Controller
             ->with('status', 'Customer created successfully.');
     }
 
-    public function edit(Customer $customer): View
+    public function edit(Customer $customer): View|JsonResponse
     {
         return view('customers.edit', ['customer' => $customer]);
     }
@@ -118,8 +130,18 @@ class CustomerWebController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'string', 'max:30'],
+            'address_line1' => ['nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:120'],
+            'state_region' => ['nullable', 'string', 'max:120'],
+            'postal_code' => ['nullable', 'string', 'max:30'],
+            'country' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (array_key_exists('country', $validated)) {
+            $validated['country'] = CustomerGeo::normalizeCountry($validated['country'] ?? null);
+        }
 
         $customer->update($validated);
 
@@ -157,7 +179,7 @@ class CustomerWebController extends Controller
             ->with('status', 'Customer deleted successfully.');
     }
 
-    public function show(Customer $customer): View
+    public function show(Customer $customer): View|JsonResponse
     {
         return view('customers.show', $this->customerShowPayload($customer));
     }

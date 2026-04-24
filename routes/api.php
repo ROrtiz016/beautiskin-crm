@@ -53,7 +53,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('customers/{customer}/edit', [CustomersSpaController::class, 'edit']);
         Route::get('customers/{customer}/timeline', [ActivitySpaController::class, 'customerTimeline']);
         Route::get('customers/{customer}', [CustomersSpaController::class, 'show']);
-        Route::get('activities', [ActivitySpaController::class, 'index']);
         Route::get('tasks', [TasksSpaController::class, 'index']);
         Route::get('appointments', [AppointmentsSpaController::class, 'index']);
         Route::get('leads', [LeadsSpaController::class, 'index']);
@@ -67,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('memberships', [MembershipsSpaController::class, 'index']);
 
         Route::middleware('can:access-admin-board')->group(function (): void {
+            Route::get('activities', [ActivitySpaController::class, 'index']);
             Route::get('admin/operations', [OperationsSpaController::class, 'index']);
             Route::get('admin/reports', [ReportsSpaController::class, 'index']);
             Route::get('admin/control-board', [AdminControlBoardSpaController::class, 'index']);

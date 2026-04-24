@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Service;
 use App\Models\TreatmentPackage;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TreatmentPackageWebController extends Controller
 {
-    public function index(): View
+    public function index(): View|JsonResponse
     {
         return view('packages.index', $this->packagesIndexPayload());
     }

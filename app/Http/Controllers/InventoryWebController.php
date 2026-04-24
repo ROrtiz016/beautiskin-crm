@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Service;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class InventoryWebController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('inventory.index', $this->inventoryIndexPayload($request));
     }

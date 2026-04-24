@@ -9,6 +9,7 @@ use App\Support\LeadFunnelMetrics;
 use App\Support\LeadSource;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ class LeadsController extends Controller
 {
     private const STATUSES = ['waiting', 'contacted', 'booked', 'cancelled'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('leads.index', $this->leadsIndexPayload($request));
     }

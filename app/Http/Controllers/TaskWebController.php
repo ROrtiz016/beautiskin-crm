@@ -11,6 +11,7 @@ use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentFormLookupCache;
 use App\Support\CustomerTimeline;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class TaskWebController extends Controller
 {
     private const VIEWS = ['my_today', 'mine_pending', 'overdue', 'upcoming', 'all_pending'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('tasks.index', $this->tasksIndexPayload($request));
     }

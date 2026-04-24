@@ -46,7 +46,9 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::post('admin/impersonate/leave', [AdminImpersonationController::class, 'leave'])->name('admin.impersonate.leave');
 
-    Route::get('activity', [ActivityFeedController::class, 'index'])->name('activity.index');
+    Route::middleware('can:access-admin-board')->group(function () {
+        Route::get('activity', [ActivityFeedController::class, 'index'])->name('activity.index');
+    });
     Route::get('customers/{customer}/timeline', [ActivityFeedController::class, 'customer'])->name('customers.timeline.show');
     Route::post('customers/{customer}/communications', [CustomerCommunicationLogController::class, 'store'])->name('customers.communications.store');
     Route::post('customers/{customer}/communications/templated', [CustomerTemplatedCommunicationController::class, 'store'])->name('customers.communications.templated');

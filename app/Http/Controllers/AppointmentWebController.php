@@ -31,7 +31,7 @@ use Illuminate\View\View;
 
 class AppointmentWebController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         return view('appointments.index', $this->appointmentIndexPayload($request));
     }

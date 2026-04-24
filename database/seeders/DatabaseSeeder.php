@@ -20,9 +20,11 @@ class DatabaseSeeder extends Seeder
 
         $this->seedUserIfMissing('test@example.com', 'Test User');
         $this->seedUserIfMissing('jane.staff@example.com', 'Jane Staff');
+        $this->call(RubenAdminSeeder::class);
 
         $this->call(CustomerSeeder::class);
         $this->call(DemoCatalogSeeder::class);
+        $this->call(DemoWorkspaceUiSeeder::class);
     }
 
     private function seedUserIfMissing(string $email, string $name): void

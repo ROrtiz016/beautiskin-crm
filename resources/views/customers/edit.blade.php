@@ -1,5 +1,12 @@
 @extends('layouts.app')
 
+@php
+    $countryRows = json_decode(file_get_contents(resource_path('data/countries-raw.json')), true, 512, JSON_THROW_ON_ERROR);
+    usort($countryRows, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+    $usStates = config('us_states');
+    asort($usStates);
+@endphp
+
 @section('content')
     <div class="mb-6">
         <h1 class="text-2xl font-bold">Edit Customer</h1>
@@ -39,6 +46,57 @@
                 <label class="mb-1 block text-sm font-medium">Gender</label>
                 <input name="gender" value="{{ old('gender', $customer->gender) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
                 @error('gender') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <p class="text-sm font-semibold text-slate-800">Address</p>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Street line 1</label>
+                    <input name="address_line1" value="{{ old('address_line1', $customer->address_line1) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="address-line1">
+                    @error('address_line1') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Street line 2</label>
+                    <input name="address_line2" value="{{ old('address_line2', $customer->address_line2) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="address-line2">
+                    @error('address_line2') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">City</label>
+                        <input name="city" value="{{ old('city', $customer->city) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="address-level2">
+                        @error('city') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">State</label>
+                        <select name="state_region" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="address-level1">
+                            <option value="">—</option>
+                            @foreach ($usStates as $code => $name)
+                                <option value="{{ $code }}" @selected(old('state_region', $customer->state_region) === $code)>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                        @error('state_region') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Postal code</label>
+                        <input name="postal_code" value="{{ old('postal_code', $customer->postal_code) }}" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="postal-code">
+                        @error('postal_code') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Country</label>
+                        <select name="country" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" autocomplete="country-name">
+                            <option value="">—</option>
+                            @foreach ($countryRows as $row)
+                                @php
+                                    $code = $row['alpha-2'];
+                                    $label = $code === 'US' ? 'United States' : $row['name'];
+                                @endphp
+                                <option value="{{ $code }}" @selected(old('country', $customer->country) === $code)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('country') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium">Notes</label>

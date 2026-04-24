@@ -19,3 +19,52 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Text fields: black for readability (esp. when OS prefers dark; body --foreground can be light).
+ * Scoped to body so filter toolbars and comboboxes (not always inside <form>) match login fields.
+ * Excludes checkbox/radio/hidden/file/button/image (not text entry).
+ */
+body
+  input:where(
+    :not([type]),
+    [type="text"],
+    [type="email"],
+    [type="password"],
+    [type="search"],
+    [type="tel"],
+    [type="url"],
+    [type="number"],
+    [type="date"],
+    [type="datetime-local"],
+    [type="time"],
+    [type="month"],
+    [type="week"]
+  ),
+body textarea,
+body select {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+body
+  input:where(
+    :not([type]),
+    [type="text"],
+    [type="email"],
+    [type="password"],
+    [type="search"],
+    [type="tel"],
+    [type="url"],
+    [type="number"],
+    [type="date"],
+    [type="datetime-local"],
+    [type="time"],
+    [type="month"],
+    [type="week"]
+  ):is(:-webkit-autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #000000 !important;
+  color: #000000 !important;
+}

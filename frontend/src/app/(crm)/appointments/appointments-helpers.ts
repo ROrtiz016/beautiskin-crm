@@ -6,6 +6,21 @@ export function ymFromMonthBase(raw: string): string {
   return ymd(raw).slice(0, 7);
 }
 
+/** e.g. "2026-04" → "April 2026" (locale month name, 4-digit year). */
+export function formatMonthYearLabel(ym: string): string {
+  const parts = ym.split("-");
+  if (parts.length < 2) {
+    return ym;
+  }
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return ym;
+  }
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
 export function shiftMonth(ym: string, delta: number): string {
   const [y, m] = ym.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
