@@ -13,7 +13,7 @@ class ActivityFeedController extends Controller
     /**
      * @return list<string>
      */
-    private function activityListColumns(): array
+    protected function activityListColumns(): array
     {
         return [
             'id',
@@ -29,6 +29,14 @@ class ActivityFeedController extends Controller
     }
 
     public function index(Request $request): View
+    {
+        return view('activity.index', $this->activityIndexPayload($request));
+    }
+
+    /**
+     * @return array{title: string, activities: \Illuminate\Contracts\Pagination\LengthAwarePaginator, categoryLabels: array<string, string>}
+     */
+    protected function activityIndexPayload(Request $request): array
     {
         $customerSearch = trim((string) $request->query('customer', ''));
 
@@ -49,14 +57,22 @@ class ActivityFeedController extends Controller
             ->paginate(35)
             ->withQueryString();
 
-        return view('activity.index', [
+        return [
             'title' => 'Activity · BeautiSkin CRM',
             'activities' => $activities,
             'categoryLabels' => CustomerActivity::categoryLabels(),
-        ]);
+        ];
     }
 
     public function customer(Request $request, Customer $customer): View
+    {
+        return view('customers.timeline', $this->customerTimelinePayload($request, $customer));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function customerTimelinePayload(Request $request, Customer $customer): array
     {
         $recentAppointments = Appointment::query()
             ->where('customer_id', $customer->id)
@@ -74,12 +90,12 @@ class ActivityFeedController extends Controller
             ->paginate(35)
             ->withQueryString();
 
-        return view('customers.timeline', [
+        return [
             'title' => $customer->first_name.' '.$customer->last_name.' · Timeline',
             'customer' => $customer,
             'activities' => $activities,
             'categoryLabels' => CustomerActivity::categoryLabels(),
             'recentAppointments' => $recentAppointments,
-        ]);
+        ];
     }
 }

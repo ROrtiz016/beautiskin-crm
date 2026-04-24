@@ -12,6 +12,14 @@ class MembershipWebController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('memberships.index', $this->membershipsIndexPayload($request));
+    }
+
+    /**
+     * @return array{memberships: \Illuminate\Database\Eloquent\Collection<int, Membership>, search: string}
+     */
+    protected function membershipsIndexPayload(Request $request): array
+    {
         $search = trim((string) $request->query('search', ''));
 
         $memberships = Membership::query()
@@ -22,10 +30,10 @@ class MembershipWebController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('memberships.index', [
+        return [
             'memberships' => $memberships,
             'search' => $search,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

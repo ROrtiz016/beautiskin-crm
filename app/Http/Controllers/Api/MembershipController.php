@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Membership;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class MembershipController extends Controller
 {
@@ -47,10 +49,16 @@ class MembershipController extends Controller
         return response()->json($membership->fresh());
     }
 
-    public function destroy(Membership $membership): JsonResponse
+    public function destroy(Membership $membership): JsonResponse|Response
     {
-        $membership->delete();
+        try {
+            $membership->delete();
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'This membership cannot be deleted because it is linked to customer subscriptions or service coverage.',
+            ], 422);
+        }
 
-        return response()->json(status: 204);
+        return response()->noContent();
     }
 }

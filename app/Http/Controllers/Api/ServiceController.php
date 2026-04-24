@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Service;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 
 class ServiceController extends Controller
@@ -86,10 +88,16 @@ class ServiceController extends Controller
         return response()->json($service->fresh()->load(['staffUsers', 'coveredByMemberships']));
     }
 
-    public function destroy(Service $service): JsonResponse
+    public function destroy(Service $service): JsonResponse|Response
     {
-        $service->delete();
+        try {
+            $service->delete();
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'This service cannot be deleted because it is linked to past appointments. You can mark it inactive instead.',
+            ], 422);
+        }
 
-        return response()->json(status: 204);
+        return response()->noContent();
     }
 }

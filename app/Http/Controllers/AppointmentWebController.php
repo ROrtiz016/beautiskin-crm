@@ -6,16 +6,19 @@ use App\Models\Appointment;
 use App\Models\AppointmentPaymentEntry;
 use App\Models\ClinicSetting;
 use App\Models\CommunicationLog;
-use App\Models\Service;
 use App\Models\WaitlistEntry;
 use App\Notifications\AppointmentReminderNotification;
 use App\Services\CommunicationRecorder;
 use App\Services\CustomerMessagingTemplateService;
 use App\Services\AppointmentPolicyEnforcer;
 use App\Support\AppointmentCancellation;
+use App\Support\AppointmentDayReschedule;
 use App\Support\AppointmentFormLookupCache;
 use App\Support\AppointmentLedger;
+use App\Support\AppointmentServiceSync;
+use App\Support\AppointmentStaffConflicts;
 use App\Support\ContactMethod;
+use App\Support\FrontendAppUrl;
 use App\Support\LeadSource;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,12 +27,19 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AppointmentWebController extends Controller
 {
     public function index(Request $request): View
+    {
+        return view('appointments.index', $this->appointmentIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function appointmentIndexPayload(Request $request): array
     {
         $today = Carbon::today();
         $hasExplicitDate = $request->query->has('date');
@@ -64,7 +74,6 @@ class AppointmentWebController extends Controller
 
         $selectedWaitlistEntries = $this->waitlistEntriesForDate($selectedDate);
 
-        $todayStr = $today->toDateString();
         if ($today->between($calendarStart->copy()->startOfDay(), $calendarEnd->copy()->endOfDay())) {
             $todaysAppointments = $selectedDate->isSameDay($today)
                 ? $selectedAppointments
@@ -97,7 +106,7 @@ class AppointmentWebController extends Controller
             $weeks[] = $week;
         }
 
-        return view('appointments.index', [
+        return [
             'today' => $today,
             'selectedDate' => $selectedDate,
             'monthBase' => $monthBase,
@@ -112,11 +121,17 @@ class AppointmentWebController extends Controller
             'filters' => $this->filterParamsFromRequest($request),
             'clinicSettings' => ClinicSetting::current(),
             'leadSourceOptions' => LeadSource::selectOptions(),
-        ]);
+        ];
     }
 
     public function dayFragment(Request $request): JsonResponse
     {
+        if (FrontendAppUrl::isConfigured()) {
+            return response()->json([
+                'message' => 'This HTML fragment endpoint is retired when FRONTEND_URL is set. Use GET /api/spa/appointments with the same query parameters as the calendar.',
+            ], 410);
+        }
+
         $today = Carbon::today();
         $selectedDate = $this->parseDate((string) $request->query('date', $today->toDateString()), $today);
         $monthBase = $this->parseMonth((string) $request->query('month', $selectedDate->format('Y-m')), $selectedDate);
@@ -167,8 +182,7 @@ class AppointmentWebController extends Controller
 
         AppointmentLedger::recordBookingDepositIfPaid($appointment, $depositPaid, $depositAmount, $request->user()?->id);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => Carbon::parse($validated['scheduled_at'])->format('Y-m'),
                 'date' => Carbon::parse($validated['scheduled_at'])->toDateString(),
             ])
@@ -203,8 +217,7 @@ class AppointmentWebController extends Controller
             $this->syncAppointmentServices($appointment, $validated['services']);
         }
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -233,8 +246,7 @@ class AppointmentWebController extends Controller
             'recorded_by_user_id' => $request->user()?->id,
         ]);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -246,8 +258,7 @@ class AppointmentWebController extends Controller
         $appointment = $appointmentPaymentEntry->appointment;
         $appointmentPaymentEntry->delete();
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -261,35 +272,7 @@ class AppointmentWebController extends Controller
         ]);
 
         $targetDate = Carbon::parse($validated['target_date']);
-        $scheduledAt = $appointment->scheduled_at
-            ? $appointment->scheduled_at->copy()->setDate($targetDate->year, $targetDate->month, $targetDate->day)
-            : $targetDate->copy()->setTime(9, 0);
-        $endsAt = $appointment->ends_at
-            ? $appointment->ends_at->copy()->setDate($targetDate->year, $targetDate->month, $targetDate->day)
-            : null;
-
-        $payload = [
-            'customer_id' => $appointment->customer_id,
-            'staff_user_id' => $appointment->staff_user_id,
-            'scheduled_at' => $scheduledAt->format('Y-m-d H:i:s'),
-            'ends_at' => $endsAt?->format('Y-m-d H:i:s'),
-            'services' => $appointment->services->map(fn ($service) => [
-                'service_id' => $service->service_id,
-                'quantity' => $service->quantity,
-            ])->values()->all(),
-        ];
-
-        $this->ensureNoStaffConflict($payload, $appointment);
-
-        AppointmentPolicyEnforcer::assertMaxBookingsNotExceeded(
-            AppointmentPolicyEnforcer::appointmentDateKey($payload['scheduled_at']),
-            $appointment->id
-        );
-
-        $appointment->update([
-            'scheduled_at' => $payload['scheduled_at'],
-            'ends_at' => $payload['ends_at'],
-        ]);
+        AppointmentDayReschedule::moveToDate($appointment, $targetDate);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
@@ -298,8 +281,7 @@ class AppointmentWebController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -311,11 +293,10 @@ class AppointmentWebController extends Controller
         $appointment->loadMissing(['customer', 'services', 'staffUser']);
 
         if (! $appointment->customer?->email) {
-            return redirect()
-                ->route('appointments.index', [
-                    'month' => optional($appointment->scheduled_at)->format('Y-m'),
-                    'date' => optional($appointment->scheduled_at)->toDateString(),
-                ])
+            return FrontendAppUrl::redirectToAppointmentsIndex([
+                'month' => optional($appointment->scheduled_at)->format('Y-m'),
+                'date' => optional($appointment->scheduled_at)->toDateString(),
+            ])
                 ->with('error', 'This customer does not have an email address on file.');
         }
 
@@ -346,8 +327,7 @@ class AppointmentWebController extends Controller
             'email_reminder_sent_at' => now(),
         ]);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -364,8 +344,7 @@ class AppointmentWebController extends Controller
             AppointmentCancellation::attributesWhenChangingStatus($request, $appointment, $validated['status'])
         );
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -382,8 +361,7 @@ class AppointmentWebController extends Controller
             'arrived_confirmed' => (bool) $validated['arrived_confirmed'],
         ]);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -400,8 +378,7 @@ class AppointmentWebController extends Controller
             'staff_user_id' => $validated['staff_user_id'] ?? null,
         ]);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($appointment->scheduled_at)->format('Y-m'),
                 'date' => optional($appointment->scheduled_at)->toDateString(),
             ])
@@ -438,8 +415,7 @@ class AppointmentWebController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => Carbon::parse($validated['preferred_date'])->format('Y-m'),
                 'date' => Carbon::parse($validated['preferred_date'])->toDateString(),
             ])
@@ -471,8 +447,7 @@ class AppointmentWebController extends Controller
             return redirect()->route('leads.index')->with('status', $message);
         }
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($waitlistEntry->preferred_date)->format('Y-m'),
                 'date' => optional($waitlistEntry->preferred_date)->toDateString(),
             ])
@@ -502,8 +477,7 @@ class AppointmentWebController extends Controller
             return redirect()->route('leads.index')->with('status', $message);
         }
 
-        return redirect()
-            ->route('appointments.index', [
+        return FrontendAppUrl::redirectToAppointmentsIndex([
                 'month' => optional($waitlistEntry->preferred_date)->format('Y-m'),
                 'date' => optional($waitlistEntry->preferred_date)->toDateString(),
             ])
@@ -515,7 +489,7 @@ class AppointmentWebController extends Controller
      *
      * @return Builder<Appointment>
      */
-    private function appointmentsFilteredQuery(Request $request): Builder
+    protected function appointmentsFilteredQuery(Request $request): Builder
     {
         $status = (string) $request->query('status', '');
         $customerId = (int) $request->query('customer_id', 0);
@@ -558,7 +532,7 @@ class AppointmentWebController extends Controller
     /**
      * @return Builder<Appointment>
      */
-    private function appointmentsBaseQuery(Request $request): Builder
+    protected function appointmentsBaseQuery(Request $request): Builder
     {
         return $this->appointmentsFilteredQuery($request)
             ->withSum('paymentEntries', 'amount')
@@ -611,7 +585,7 @@ class AppointmentWebController extends Controller
     /**
      * @return array{status: string, customer_id: int, search: string, service_id: int, arrived: string, staff_user_id: int}
      */
-    private function filterParamsFromRequest(Request $request): array
+    protected function filterParamsFromRequest(Request $request): array
     {
         return [
             'status' => (string) $request->query('status', ''),
@@ -623,7 +597,7 @@ class AppointmentWebController extends Controller
         ];
     }
 
-    private function validateAppointmentPayload(Request $request): array
+    protected function validateAppointmentPayload(Request $request): array
     {
         return $request->validate(array_merge([
             'customer_id' => ['required', 'exists:customers,id'],
@@ -643,66 +617,17 @@ class AppointmentWebController extends Controller
         ], AppointmentPolicyEnforcer::depositRulesForRequest()));
     }
 
-    private function ensureNoStaffConflict(array $validated, ?Appointment $ignoreAppointment = null): void
+    protected function ensureNoStaffConflict(array $validated, ?Appointment $ignoreAppointment = null): void
     {
-        $staffUserId = (int) ($validated['staff_user_id'] ?? 0);
-        if ($staffUserId === 0) {
-            return;
-        }
-
-        $start = Carbon::parse($validated['scheduled_at']);
-        $end = ! empty($validated['ends_at'])
-            ? Carbon::parse($validated['ends_at'])
-            : $start->copy()->addMinutes($this->estimatedDurationMinutes($validated['services'] ?? []));
-
-        $conflict = Appointment::query()
-            ->where('staff_user_id', $staffUserId)
-            ->whereNotIn('status', ['cancelled', 'no_show'])
-            ->when($ignoreAppointment, function (Builder $query) use ($ignoreAppointment) {
-                $query->where('id', '!=', $ignoreAppointment->id);
-            })
-            ->where(function (Builder $query) use ($start, $end) {
-                $query
-                    ->where('scheduled_at', '<', $end)
-                    ->whereRaw('COALESCE(ends_at, DATE_ADD(scheduled_at, INTERVAL 60 MINUTE)) > ?', [$start->format('Y-m-d H:i:s')]);
-            })
-            ->with(['customer:id,first_name,last_name'])
-            ->first();
-
-        if (! $conflict) {
-            return;
-        }
-
-        $name = trim((string) ($conflict->customer?->first_name.' '.$conflict->customer?->last_name));
-
-        throw ValidationException::withMessages([
-            'scheduled_at' => [
-                'This staff member already has an overlapping appointment'
-                .($name !== '' ? ' with '.$name : '')
-                .' at '
-                .optional($conflict->scheduled_at)->format('g:i A')
-                .'.',
-            ],
-        ]);
+        AppointmentStaffConflicts::assertNoOverlap($validated, $ignoreAppointment);
     }
 
-    private function estimatedDurationMinutes(array $serviceLines): int
+    protected function estimatedDurationMinutes(array $serviceLines): int
     {
-        $total = 0;
-
-        foreach ($serviceLines as $line) {
-            $service = Service::query()->find((int) ($line['service_id'] ?? 0));
-            if (! $service) {
-                continue;
-            }
-
-            $total += ((int) $service->duration_minutes) * max(1, (int) ($line['quantity'] ?? 1));
-        }
-
-        return max($total, 60);
+        return AppointmentStaffConflicts::estimatedDurationMinutes($serviceLines);
     }
 
-    private function buildStaffAvailability(Collection $appointments, Collection $staffUsers): Collection
+    protected function buildStaffAvailability(Collection $appointments, Collection $staffUsers): Collection
     {
         $availability = $staffUsers->map(function (object $staff) use ($appointments) {
             $assigned = $appointments
@@ -733,7 +658,7 @@ class AppointmentWebController extends Controller
         return $availability;
     }
 
-    private function waitlistEntriesForDate(Carbon $selectedDate): Collection
+    protected function waitlistEntriesForDate(Carbon $selectedDate): Collection
     {
         return WaitlistEntry::query()
             ->with([
@@ -749,31 +674,12 @@ class AppointmentWebController extends Controller
             ->get();
     }
 
-    private function syncAppointmentServices(Appointment $appointment, array $serviceLines): void
+    protected function syncAppointmentServices(Appointment $appointment, array $serviceLines): void
     {
-        $appointment->services()->delete();
-        $total = 0.0;
-
-        foreach ($serviceLines as $line) {
-            $service = Service::query()->findOrFail((int) $line['service_id']);
-            $quantity = (int) ($line['quantity'] ?? 1);
-            $lineTotal = round(((float) $service->price) * $quantity, 2);
-            $total = round($total + $lineTotal, 2);
-
-            $appointment->services()->create([
-                'service_id' => $service->id,
-                'service_name' => $service->name,
-                'duration_minutes' => $service->duration_minutes,
-                'quantity' => $quantity,
-                'unit_price' => $service->price,
-                'line_total' => number_format($lineTotal, 2, '.', ''),
-            ]);
-        }
-
-        $appointment->update(['total_amount' => number_format($total, 2, '.', '')]);
+        AppointmentServiceSync::sync($appointment, $serviceLines);
     }
 
-    private function parseDate(string $raw, Carbon $fallback): Carbon
+    protected function parseDate(string $raw, Carbon $fallback): Carbon
     {
         try {
             return Carbon::parse($raw);
@@ -782,14 +688,14 @@ class AppointmentWebController extends Controller
         }
     }
 
-    private function parseMonth(string $raw, Carbon $fallback): Carbon
+    protected function parseMonth(string $raw, Carbon $fallback): Carbon
     {
         $month = Carbon::createFromFormat('Y-m', $raw);
 
         return $month ?: $fallback->copy();
     }
 
-    private function defaultSelectedDate(Collection $appointmentsByDate, Carbon $today, Carbon $monthBase): Carbon
+    protected function defaultSelectedDate(Collection $appointmentsByDate, Carbon $today, Carbon $monthBase): Carbon
     {
         $dateKeys = $appointmentsByDate->keys()
             ->map(fn (string $key) => Carbon::parse($key))

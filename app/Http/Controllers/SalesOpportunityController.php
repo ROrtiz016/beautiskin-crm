@@ -19,6 +19,14 @@ class SalesOpportunityController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('sales.pipeline', $this->pipelineIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function pipelineIndexPayload(Request $request): array
+    {
         $customerId = (int) $request->query('customer_id', 0);
         if ($customerId > 0 && ! Customer::query()->whereKey($customerId)->exists()) {
             $customerId = 0;
@@ -50,7 +58,7 @@ class SalesOpportunityController extends Controller
 
         $filterCustomer = $customerId > 0 ? Customer::query()->find($customerId) : null;
 
-        return view('sales.pipeline', [
+        return [
             'title' => 'Sales pipeline · BeautiSkin CRM',
             'byStage' => $byStage,
             'openStages' => $openStages,
@@ -63,7 +71,7 @@ class SalesOpportunityController extends Controller
             'countsOpen' => $countsOpen,
             'customerIdFilter' => $customerId,
             'filterCustomer' => $filterCustomer,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

@@ -28,6 +28,14 @@ class CustomerWebController extends Controller
 
     public function index(Request $request): View
     {
+        return view('customers.index', $this->customersIndexPayload($request));
+    }
+
+    /**
+     * @return array{customers: \Illuminate\Contracts\Pagination\LengthAwarePaginator, search: string, sort: string, direction: string}
+     */
+    protected function customersIndexPayload(Request $request): array
+    {
         $search = trim((string) $request->query('search', ''));
         $sort = (string) $request->query('sort', 'created_at');
         $direction = strtolower((string) $request->query('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
@@ -64,12 +72,12 @@ class CustomerWebController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('customers.index', [
+        return [
             'customers' => $customers,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse
@@ -150,6 +158,14 @@ class CustomerWebController extends Controller
     }
 
     public function show(Customer $customer): View
+    {
+        return view('customers.show', $this->customerShowPayload($customer));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function customerShowPayload(Customer $customer): array
     {
         $customer->load([
             'appointments' => function ($query) {
@@ -285,7 +301,7 @@ class CustomerWebController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('customers.show', [
+        return [
             'customer' => $customer,
             'paymentHistory' => $paymentHistory,
             'servicesReceived' => $servicesReceived,
@@ -302,7 +318,7 @@ class CustomerWebController extends Controller
             'retailSaleServices' => $retailSaleServices,
             'staffUsers' => AppointmentFormLookupCache::staffUsers(),
             'clinicSettings' => ClinicSetting::current(),
-        ]);
+        ];
     }
 
     public function storeAppointment(Request $request, Customer $customer): RedirectResponse

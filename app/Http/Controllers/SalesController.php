@@ -15,6 +15,14 @@ class SalesController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('sales.index', $this->salesIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function salesIndexPayload(Request $request): array
+    {
         [$from, $to, $rangeStart, $rangeEnd] = ReportDateRange::resolve($request);
 
         $rangeAgg = Appointment::query()
@@ -60,7 +68,7 @@ class SalesController extends Controller
 
         $tz = AppointmentPolicyEnforcer::clinicTimezone();
 
-        return view('sales.index', [
+        return [
             'title' => 'Sales · BeautiSkin CRM',
             'clinicTimezone' => $tz,
             'fromDate' => $from->toDateString(),
@@ -72,6 +80,6 @@ class SalesController extends Controller
             'lineItemRevenue' => $lineItemRevenue,
             'newMemberships' => $newMemberships,
             'topServices' => $topServices,
-        ]);
+        ];
     }
 }

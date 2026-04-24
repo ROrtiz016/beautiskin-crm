@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Service;
 use App\Services\AppointmentPolicyEnforcer;
+use App\Support\FrontendAppUrl;
 use App\Support\LeadFunnelMetrics;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -16,6 +17,14 @@ class HomeController extends Controller
     private const BESTSELLER_DAYS = 90;
 
     public function index(): View
+    {
+        return view('welcome', $this->homeWelcomePayload());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function homeWelcomePayload(): array
     {
         $todaysAppointmentCount = null;
         $clinicTodayLabel = null;
@@ -42,10 +51,16 @@ class HomeController extends Controller
                 ->count();
 
             $clinicTodayLabel = now($tz)->format('l, M j, Y');
-            $appointmentsTodayUrl = route('appointments.index', [
+            $appointmentsTodayQuery = [
                 'month' => now($tz)->format('Y-m'),
                 'date' => $todayKey,
-            ]);
+            ];
+            $appointmentsTodayUrl = FrontendAppUrl::toSpaOrRoute(
+                '/appointments',
+                'appointments.index',
+                [],
+                $appointmentsTodayQuery,
+            );
 
             $since = $this->bestsellerWindowStart($tz);
 
@@ -56,7 +71,7 @@ class HomeController extends Controller
             $leadFunnel = LeadFunnelMetrics::snapshot();
         }
 
-        return view('welcome', [
+        return [
             'todaysAppointmentCount' => $todaysAppointmentCount,
             'clinicTodayLabel' => $clinicTodayLabel,
             'appointmentsTodayUrl' => $appointmentsTodayUrl,
@@ -65,10 +80,10 @@ class HomeController extends Controller
             'topProducts' => $topProducts,
             'bestsellerDays' => self::BESTSELLER_DAYS,
             ...$leadFunnel,
-        ]);
+        ];
     }
 
-    private function bestsellerWindowStart(string $clinicTz): Carbon
+    protected function bestsellerWindowStart(string $clinicTz): Carbon
     {
         return now($clinicTz)
             ->subDays(self::BESTSELLER_DAYS)
@@ -79,7 +94,7 @@ class HomeController extends Controller
     /**
      * @return Collection<int, object{name: string, revenue: float, units: float|int}>
      */
-    private function topSellingServices(Carbon $since, bool $includeProductCategories): Collection
+    protected function topSellingServices(Carbon $since, bool $includeProductCategories): Collection
     {
         $productCategories = Service::retailCategoryKeys();
 
@@ -106,7 +121,7 @@ class HomeController extends Controller
     /**
      * @return Collection<int, object{name: string, sold_count: int, revenue: float}>
      */
-    private function topSellingMemberships(Carbon $since): Collection
+    protected function topSellingMemberships(Carbon $since): Collection
     {
         return DB::table('customer_memberships')
             ->join('memberships', 'customer_memberships.membership_id', '=', 'memberships.id')

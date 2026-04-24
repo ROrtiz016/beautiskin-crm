@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\BusinessSettingsTestNotification;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -100,9 +101,17 @@ class AdminControlBoardController extends Controller
 
     public function index(Request $request): View
     {
+        return view('admin.control-board', $this->controlBoardPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function controlBoardPayload(Request $request): array
+    {
         [$auditLogs, $auditHasFilters] = $this->filteredAuditLogs($request);
 
-        return view('admin.control-board', [
+        return [
             'users' => User::withTrashed()
                 ->orderByRaw('deleted_at IS NULL DESC')
                 ->orderBy('name')
@@ -144,10 +153,10 @@ class AdminControlBoardController extends Controller
             'auditActionOptions' => self::AUDIT_ACTION_OPTIONS,
             'auditEntityTypeOptions' => self::AUDIT_ENTITY_TYPE_OPTIONS,
             'controlBoardPanelOrder' => $request->user()->dashboardPanelOrder('control_board'),
-        ]);
+        ];
     }
 
-    public function storeUser(Request $request): RedirectResponse
+    public function storeUser(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -158,6 +167,16 @@ class AdminControlBoardController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'in:'.implode(',', self::PERMISSIONS)],
         ]);
+
+        if ($request->boolean('is_admin') && ! $request->user()->is_admin) {
+            return $this->respondAdminError(
+                $request,
+                'Only administrators can create administrator accounts.',
+                'admin.control-board',
+                [],
+                403,
+            );
+        }
 
         $template = $validated['role_template'] ?? 'custom';
         if ($template !== 'custom' && isset(self::ROLE_TEMPLATES[$template])) {
@@ -190,15 +209,28 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'User created successfully.');
+        return $this->respondAdminAction(
+            $request,
+            'User created successfully.',
+            'admin.control-board',
+            [],
+            [
+                'user' => [
+                    'id' => $newUser->id,
+                    'name' => $newUser->name,
+                    'email' => $newUser->email,
+                    'is_admin' => (bool) $newUser->is_admin,
+                    'permissions' => $newUser->permissions ?? [],
+                    'deleted_at' => $newUser->deleted_at?->toIso8601String(),
+                ],
+            ],
+        );
     }
 
-    public function updateUserAccess(Request $request, User $adminUser): RedirectResponse
+    public function updateUserAccess(Request $request, User $adminUser): RedirectResponse|JsonResponse
     {
         if ($adminUser->trashed()) {
-            return redirect()
-                ->route('admin.control-board')
-                ->with('error', 'This account is deactivated. Restore it before changing access.');
+            return $this->respondAdminError($request, 'This account is deactivated. Restore it before changing access.');
         }
 
         $validated = $request->validate([
@@ -215,13 +247,37 @@ class AdminControlBoardController extends Controller
             $newPermissions = $this->normalizePermissionList($validated['permissions'] ?? []);
         }
 
+        $requestedAdmin = $request->boolean('is_admin');
+        $wasAdmin = (bool) $adminUser->is_admin;
+
+        if (! $request->user()->is_admin && $requestedAdmin !== $wasAdmin) {
+            return $this->respondAdminError(
+                $request,
+                'Only administrators can grant or revoke administrator access.',
+                'admin.control-board',
+                [],
+                403,
+            );
+        }
+
+        if ($wasAdmin && ! $requestedAdmin) {
+            $otherActiveAdmins = User::query()
+                ->where('is_admin', true)
+                ->whereNull('deleted_at')
+                ->where('id', '!=', $adminUser->id)
+                ->count();
+            if ($otherActiveAdmins === 0) {
+                return $this->respondAdminError($request, 'Cannot remove the last active administrator.');
+            }
+        }
+
         $oldValues = [
             'is_admin' => (bool) $adminUser->is_admin,
             'permissions' => $adminUser->permissions ?? [],
         ];
 
         $adminUser->update([
-            'is_admin' => $request->boolean('is_admin'),
+            'is_admin' => $requestedAdmin,
             'permissions' => $newPermissions,
         ]);
 
@@ -241,10 +297,25 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'User access updated.');
+        return $this->respondAdminAction(
+            $request,
+            'User access updated.',
+            'admin.control-board',
+            [],
+            [
+                'user' => [
+                    'id' => $adminUser->id,
+                    'name' => $adminUser->name,
+                    'email' => $adminUser->email,
+                    'is_admin' => (bool) $adminUser->is_admin,
+                    'permissions' => $adminUser->permissions ?? [],
+                    'deleted_at' => $adminUser->deleted_at?->toIso8601String(),
+                ],
+            ],
+        );
     }
 
-    public function deactivateUser(Request $request, User $adminUser): RedirectResponse
+    public function deactivateUser(Request $request, User $adminUser): RedirectResponse|JsonResponse
     {
         abort_unless(
             $request->user()->is_admin || $request->user()->hasAdminPermission('manage_users'),
@@ -252,11 +323,11 @@ class AdminControlBoardController extends Controller
         );
 
         if ($adminUser->trashed()) {
-            return redirect()->route('admin.control-board')->with('error', 'This account is already deactivated.');
+            return $this->respondAdminError($request, 'This account is already deactivated.');
         }
 
         if ((int) $adminUser->id === (int) $request->user()->id) {
-            return redirect()->route('admin.control-board')->with('error', 'You cannot deactivate your own account from here.');
+            return $this->respondAdminError($request, 'You cannot deactivate your own account from here.');
         }
 
         if ($adminUser->is_admin) {
@@ -266,9 +337,7 @@ class AdminControlBoardController extends Controller
                 ->where('id', '!=', $adminUser->id)
                 ->count();
             if ($otherActiveAdmins === 0) {
-                return redirect()
-                    ->route('admin.control-board')
-                    ->with('error', 'You cannot deactivate the only active administrator.');
+                return $this->respondAdminError($request, 'You cannot deactivate the only active administrator.');
             }
         }
 
@@ -288,10 +357,21 @@ class AdminControlBoardController extends Controller
 
         $adminUser->delete();
 
-        return redirect()->route('admin.control-board')->with('status', 'User deactivated. They can no longer sign in.');
+        return $this->respondAdminAction(
+            $request,
+            'User deactivated. They can no longer sign in.',
+            'admin.control-board',
+            [],
+            [
+                'user' => [
+                    'id' => $adminUser->id,
+                    'deleted_at' => $adminUser->deleted_at?->toIso8601String(),
+                ],
+            ],
+        );
     }
 
-    public function restoreUser(Request $request, User $adminUser): RedirectResponse
+    public function restoreUser(Request $request, User $adminUser): RedirectResponse|JsonResponse
     {
         abort_unless(
             $request->user()->is_admin || $request->user()->hasAdminPermission('manage_users'),
@@ -299,7 +379,7 @@ class AdminControlBoardController extends Controller
         );
 
         if (! $adminUser->trashed()) {
-            return redirect()->route('admin.control-board')->with('error', 'This account is already active.');
+            return $this->respondAdminError($request, 'This account is already active.');
         }
 
         AdminAuditLog::record(
@@ -318,10 +398,21 @@ class AdminControlBoardController extends Controller
 
         $adminUser->restore();
 
-        return redirect()->route('admin.control-board')->with('status', 'User restored. They can sign in again.');
+        return $this->respondAdminAction(
+            $request,
+            'User restored. They can sign in again.',
+            'admin.control-board',
+            [],
+            [
+                'user' => [
+                    'id' => $adminUser->id,
+                    'deleted_at' => null,
+                ],
+            ],
+        );
     }
 
-    public function updateServicePrice(Request $request, Service $service): RedirectResponse
+    public function updateServicePrice(Request $request, Service $service): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'price' => ['required', 'numeric', 'min:0'],
@@ -343,10 +434,22 @@ class AdminControlBoardController extends Controller
             ['name' => $service->name, 'price' => (string) $service->price],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Service price updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Service price updated.',
+            'admin.control-board',
+            [],
+            [
+                'service' => [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'price' => (string) $service->price,
+                ],
+            ],
+        );
     }
 
-    public function updateMembershipPrice(Request $request, Membership $membership): RedirectResponse
+    public function updateMembershipPrice(Request $request, Membership $membership): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'price' => ['required', 'numeric', 'min:0'],
@@ -368,16 +471,30 @@ class AdminControlBoardController extends Controller
             ['name' => $membership->name, 'monthly_price' => (string) $membership->monthly_price],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Membership price updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Membership price updated.',
+            'admin.control-board',
+            [],
+            [
+                'membership' => [
+                    'id' => $membership->id,
+                    'name' => $membership->name,
+                    'monthly_price' => (string) $membership->monthly_price,
+                ],
+            ],
+        );
     }
 
-    public function storePromotion(Request $request): RedirectResponse
+    public function storePromotion(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $this->validatedPromotionRules($request);
 
         $promotion = Promotion::query()->create($validated['attributes']);
 
         $this->syncPromotionTargets($promotion, $validated['service_ids'], $validated['membership_ids']);
+
+        $promotion->load(['targetedServices:id,name', 'targetedMemberships:id,name']);
 
         AdminAuditLog::record(
             $request,
@@ -389,10 +506,16 @@ class AdminControlBoardController extends Controller
             $this->promotionAuditSnapshot($promotion),
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Promotion added successfully.');
+        return $this->respondAdminAction(
+            $request,
+            'Promotion added successfully.',
+            'admin.control-board',
+            [],
+            ['promotion' => $this->promotionJsonSnapshot($promotion)],
+        );
     }
 
-    public function updatePromotionStatus(Request $request, Promotion $promotion): RedirectResponse
+    public function updatePromotionStatus(Request $request, Promotion $promotion): RedirectResponse|JsonResponse
     {
         $oldActive = (bool) $promotion->is_active;
 
@@ -412,10 +535,21 @@ class AdminControlBoardController extends Controller
             ['name' => $promotion->name, 'is_active' => $promotion->is_active],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Promotion status updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Promotion status updated.',
+            'admin.control-board',
+            [],
+            [
+                'promotion' => [
+                    'id' => $promotion->id,
+                    'is_active' => (bool) $promotion->is_active,
+                ],
+            ],
+        );
     }
 
-    public function updatePromotionRules(Request $request, Promotion $promotion): RedirectResponse
+    public function updatePromotionRules(Request $request, Promotion $promotion): RedirectResponse|JsonResponse
     {
         $validated = $this->validatedPromotionRules($request);
 
@@ -438,10 +572,16 @@ class AdminControlBoardController extends Controller
             $this->promotionAuditSnapshot($promotion),
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Promotion rules updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Promotion rules updated.',
+            'admin.control-board',
+            [],
+            ['promotion' => $this->promotionJsonSnapshot($promotion)],
+        );
     }
 
-    public function storeScheduledPriceChange(Request $request): RedirectResponse
+    public function storeScheduledPriceChange(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'priceable' => ['required', 'regex:/^(service|membership):[1-9][0-9]*$/'],
@@ -459,6 +599,12 @@ class AdminControlBoardController extends Controller
         };
 
         if (! $model) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Service or membership not found for this scheduled change.',
+                ], 422);
+            }
+
             return redirect()
                 ->route('admin.control-board')
                 ->with('error', 'Service or membership not found for this scheduled change.');
@@ -487,14 +633,31 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()
-            ->route('admin.control-board')
-            ->with('status', 'Price change scheduled. Run `php artisan clinic:apply-scheduled-prices` (or your scheduler) when the effective time passes.');
+        return $this->respondAdminAction(
+            $request,
+            'Price change scheduled. Run `php artisan clinic:apply-scheduled-prices` (or your scheduler) when the effective time passes.',
+            'admin.control-board',
+            [],
+            [
+                'scheduledPriceChange' => [
+                    'id' => $change->id,
+                    'status' => $change->status,
+                    'new_price' => (string) $change->new_price,
+                    'effective_at' => $change->effective_at?->toIso8601String(),
+                ],
+            ],
+        );
     }
 
-    public function cancelScheduledPriceChange(Request $request, ScheduledPriceChange $scheduledPriceChange): RedirectResponse
+    public function cancelScheduledPriceChange(Request $request, ScheduledPriceChange $scheduledPriceChange): RedirectResponse|JsonResponse
     {
         if ($scheduledPriceChange->status !== ScheduledPriceChange::STATUS_PENDING) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Only pending scheduled changes can be cancelled.',
+                ], 422);
+            }
+
             return redirect()
                 ->route('admin.control-board')
                 ->with('error', 'Only pending scheduled changes can be cancelled.');
@@ -515,10 +678,16 @@ class AdminControlBoardController extends Controller
 
         $scheduledPriceChange->update(['status' => ScheduledPriceChange::STATUS_CANCELLED]);
 
-        return redirect()->route('admin.control-board')->with('status', 'Scheduled price change cancelled.');
+        return $this->respondAdminAction(
+            $request,
+            'Scheduled price change cancelled.',
+            'admin.control-board',
+            [],
+            ['scheduledPriceChange' => ['id' => $scheduledPriceChange->id, 'status' => $scheduledPriceChange->fresh()->status]],
+        );
     }
 
-    public function updateClinicTaxSettings(Request $request): RedirectResponse
+    public function updateClinicTaxSettings(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'default_tax_rate' => ['required', 'numeric', 'min:0', 'max:1'],
@@ -551,10 +720,16 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Tax and rounding settings saved.');
+        return $this->respondAdminAction(
+            $request,
+            'Tax and rounding settings saved.',
+            'admin.control-board',
+            [],
+            ['clinicSettings' => ClinicSetting::current()],
+        );
     }
 
-    public function updateClinicProfile(Request $request): RedirectResponse
+    public function updateClinicProfile(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'clinic_name' => ['required', 'string', 'max:255'],
@@ -601,10 +776,16 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Clinic profile updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Clinic profile updated.',
+            'admin.control-board',
+            [],
+            ['clinicSettings' => ClinicSetting::current()],
+        );
     }
 
-    public function updateMessagingSettings(Request $request): RedirectResponse
+    public function updateMessagingSettings(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'email_from_address' => ['nullable', 'email', 'max:255'],
@@ -679,10 +860,16 @@ class AdminControlBoardController extends Controller
             ],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Email/SMS settings updated.');
+        return $this->respondAdminAction(
+            $request,
+            'Email/SMS settings updated.',
+            'admin.control-board',
+            [],
+            ['clinicSettings' => ClinicSetting::current()],
+        );
     }
 
-    public function sendMessagingTest(Request $request): RedirectResponse
+    public function sendMessagingTest(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'test_email' => ['required', 'email', 'max:255'],
@@ -707,7 +894,13 @@ class AdminControlBoardController extends Controller
             ['test_email' => $validated['test_email']],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Test email sent using current messaging settings.');
+        return $this->respondAdminAction(
+            $request,
+            'Test email sent using current messaging settings.',
+            'admin.control-board',
+            [],
+            [],
+        );
     }
 
     public function exportBackupSnapshot(Request $request): StreamedResponse
@@ -777,7 +970,7 @@ class AdminControlBoardController extends Controller
         }, "customer-export-{$slug}-{$customer->id}.json", ['Content-Type' => 'application/json']);
     }
 
-    public function gdprDeleteCustomer(Request $request, Customer $customer): RedirectResponse
+    public function gdprDeleteCustomer(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $request->validate([
             'confirm_gdpr_delete' => ['required', 'accepted'],
@@ -826,7 +1019,40 @@ class AdminControlBoardController extends Controller
             ['gdpr_deleted_at' => now()->toIso8601String()],
         );
 
-        return redirect()->route('admin.control-board')->with('status', 'Customer anonymized and soft-deleted under the GDPR workflow.');
+        return $this->respondAdminAction(
+            $request,
+            'Customer anonymized and soft-deleted under the GDPR workflow.',
+            'admin.control-board',
+            [],
+            ['customer' => ['id' => $customer->id, 'gdpr_deleted' => true]],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function promotionJsonSnapshot(Promotion $promotion): array
+    {
+        return [
+            'id' => $promotion->id,
+            'name' => $promotion->name,
+            'description' => $promotion->description,
+            'discount_type' => $promotion->discount_type,
+            'discount_value' => (string) $promotion->discount_value,
+            'applies_to' => $promotion->applies_to,
+            'starts_on' => $promotion->starts_on?->toDateString(),
+            'ends_on' => $promotion->ends_on?->toDateString(),
+            'is_active' => (bool) $promotion->is_active,
+            'stackable' => (bool) $promotion->stackable,
+            'max_discount_cap' => $promotion->max_discount_cap !== null ? (string) $promotion->max_discount_cap : null,
+            'minimum_purchase' => $promotion->minimum_purchase !== null ? (string) $promotion->minimum_purchase : null,
+            'service_ids' => $promotion->relationLoaded('targetedServices')
+                ? $promotion->targetedServices->pluck('id')->values()->all()
+                : [],
+            'membership_ids' => $promotion->relationLoaded('targetedMemberships')
+                ? $promotion->targetedMemberships->pluck('id')->values()->all()
+                : [],
+        ];
     }
 
     /**
@@ -943,7 +1169,7 @@ class AdminControlBoardController extends Controller
     /**
      * @return array{0: Collection<int, AdminAuditLog>, 1: bool}
      */
-    private function filteredAuditLogs(Request $request): array
+    protected function filteredAuditLogs(Request $request): array
     {
         $hasFilters = false;
 
@@ -1016,7 +1242,7 @@ class AdminControlBoardController extends Controller
      *     audit_search: string
      * }
      */
-    private function auditFilterParamsFromRequest(Request $request): array
+    protected function auditFilterParamsFromRequest(Request $request): array
     {
         return [
             'audit_actor_id' => (int) $request->query('audit_actor_id', 0),
@@ -1029,7 +1255,7 @@ class AdminControlBoardController extends Controller
         ];
     }
 
-    private function parseAuditDate(string $raw): ?string
+    protected function parseAuditDate(string $raw): ?string
     {
         if ($raw === '') {
             return null;

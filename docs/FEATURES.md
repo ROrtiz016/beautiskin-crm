@@ -43,6 +43,13 @@ Users who are **admins** (`users.is_admin`) or have the **`manage_users`** permi
 
 **Impersonation** is blocked from using the admin board while an impersonation session is active (same gate logic).
 
+### Impersonation (Laravel web session)
+
+- **Start:** `POST /admin/impersonate/{adminUser}` (from the control board “View as” action). Requires an authenticated **web** session; stores **`impersonator_id`** in the session and re-authenticates as the target user.
+- **Leave:** `POST /admin/impersonate/leave` clears `impersonator_id` and restores the original admin session. A banner on `layouts.app` links to this while impersonating.
+- **Gates:** while `impersonator_id` is set, `access-admin-board`, `manage-feature-flags`, and `view-experimental-ui` behave as documented in `AppServiceProvider` (e.g. admin board is unavailable during impersonation).
+- **Next.js / Sanctum:** staff signed in with a **bearer token** do not use Laravel’s session store, so this impersonation flow **does not apply** to the SPA today. There is no equivalent “View as” in the Next app until a separate design (e.g. server-issued delegation or audit-safe support accounts) is implemented.
+
 ### Feature flags gate (`manage-feature-flags`)
 
 Only **admins** may update clinic **feature flags** (e.g. experimental UI) on the operations dashboard. Gate: `manage-feature-flags`.
@@ -114,6 +121,12 @@ Waitlist rows appear on the selected day when `preferred_date` matches.
 
 The selected-day panel shows whether the customer’s **active membership** covers booked services (full / partial / none), using `customer.memberships` and `membership.coveredServices` data loaded for that day’s appointments.
 
+### Staff UI: Blade calendar vs Next.js (`FRONTEND_URL`)
+
+- **Blade (legacy):** `GET /appointments` renders `resources/views/appointments/index.blade.php` with server-side HTML; **`GET /appointments/day`** returned a JSON **HTML fragment** for the selected-day panel when switching dates without a full reload.
+- **Next.js:** with `FRONTEND_URL` set, browser **GET** `/appointments` is redirected to the SPA. The calendar loads **`GET /api/spa/appointments`** (`AppointmentsSpaController` + shared payload builders from `AppointmentWebController`). The day panel is rendered in React (`frontend/src/app/(crm)/appointments/appointments-client.tsx`) instead of swapping HTML from `/appointments/day`. When the SPA is active, non-JSON **`GET /appointments/day`** may respond with **410 Gone** and a message to use the SPA payload (see `AppointmentWebController`).
+- **Parity:** the SPA implementation is large and aims to mirror filters, waitlist, booking, reminders, and membership coverage UI, but **line-by-line parity** with Blade is not guaranteed. Use Blade with `FRONTEND_URL` unset to compare behavior, or extend the SPA payload and client as needed.
+
 ---
 
 ## 4. Customer profile
@@ -140,7 +153,7 @@ High-level areas (exact panel order can be customized via [Dashboard layouts](#1
 
 - Create users, set **admin** flag and **permission** list (`manage_users`, etc.).
 - **Deactivate** (soft delete) and **restore** users.
-- **Impersonate** (`POST /admin/impersonate/{adminUser}`): act as another user; **leave** via `POST /admin/impersonate/leave` (available to the impersonated session).
+- **Impersonate** (`POST /admin/impersonate/{adminUser}`): act as another user; **leave** via `POST /admin/impersonate/leave` (available to the impersonated session). **Web session only** — see [Impersonation (Laravel web session)](#impersonation-laravel-web-session). Not available from the Sanctum-only Next.js shell.
 
 ### Pricing
 

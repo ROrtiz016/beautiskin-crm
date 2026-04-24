@@ -2,11 +2,6 @@
 
 use App\Http\Controllers\AdminControlBoardController;
 use App\Http\Controllers\AdminImpersonationController;
-use App\Http\Controllers\Api\AppointmentController;
-use App\Http\Controllers\Api\CustomerController;
-use App\Http\Controllers\Api\CustomerMembershipController;
-use App\Http\Controllers\Api\MembershipController;
-use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\ActivityFeedController;
 use App\Http\Controllers\AppointmentWebController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -157,12 +152,4 @@ Route::middleware(['auth', 'can:access-admin-board'])->prefix('admin')->name('ad
     Route::get('backup-export', [AdminControlBoardController::class, 'exportBackupSnapshot'])->name('backup.export');
     Route::get('customers/{customer}/export', [AdminControlBoardController::class, 'exportCustomerData'])->name('customers.export');
     Route::post('customers/{customer}/gdpr-delete', [AdminControlBoardController::class, 'gdprDeleteCustomer'])->name('customers.gdpr-delete');
-});
-
-Route::prefix('api')->name('api.')->group(function () {
-    Route::apiResource('customers', CustomerController::class);
-    Route::apiResource('services', ServiceController::class);
-    Route::apiResource('memberships', MembershipController::class);
-    Route::apiResource('customer-memberships', CustomerMembershipController::class);
-    Route::apiResource('appointments', AppointmentController::class);
 });

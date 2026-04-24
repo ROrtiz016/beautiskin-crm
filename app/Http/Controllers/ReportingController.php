@@ -18,6 +18,14 @@ class ReportingController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('admin.reports', $this->reportsIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function reportsIndexPayload(Request $request): array
+    {
         [$from, $to, $rangeStart, $rangeEnd] = ReportDateRange::resolve($request);
 
         $rangeAgg = Appointment::query()
@@ -69,7 +77,7 @@ class ReportingController extends Controller
         $tz = AppointmentPolicyEnforcer::clinicTimezone();
         $dailyRows = $this->buildDailyRows($from, $to, $tz, $rangeStart, $rangeEnd);
 
-        return view('admin.reports', [
+        return [
             'clinicTimezone' => $tz,
             'fromDate' => $from->toDateString(),
             'toDate' => $to->toDateString(),
@@ -83,7 +91,7 @@ class ReportingController extends Controller
             'waitlistOpened' => $waitlistOpened,
             'topServices' => $topServices,
             'dailyRows' => $dailyRows,
-        ]);
+        ];
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -120,7 +128,7 @@ class ReportingController extends Controller
     /**
      * @return list<array{date: string, scheduled_count: int, completed_revenue: float}>
      */
-    private function buildDailyRows(Carbon $from, Carbon $to, string $tz, Carbon $rangeStart, Carbon $rangeEnd): array
+    protected function buildDailyRows(Carbon $from, Carbon $to, string $tz, Carbon $rangeStart, Carbon $rangeEnd): array
     {
         $byDay = [];
         $cursor = $from->copy()->timezone($tz)->startOfDay();

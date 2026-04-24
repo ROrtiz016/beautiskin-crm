@@ -5,7 +5,7 @@
         <h1 class="text-2xl font-bold text-slate-900">Leads</h1>
         <p class="mt-1 max-w-2xl text-sm text-slate-600">
             Waitlist and standby requests tied to a customer profile. Update status as you reach out or book. Add new entries from the
-            <a href="{{ route('appointments.index') }}" class="font-semibold text-pink-700 hover:text-pink-800">Appointments</a>
+            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/appointments', 'appointments.index') }}" class="font-semibold text-pink-700 hover:text-pink-800">Appointments</a>
             calendar (waitlist button on a day).
         </p>
     </div>
@@ -243,7 +243,7 @@
                                     @endif
                                     @if ($entry->customer && ! $entry->customer->trashed() && $entry->preferred_date)
                                         <a
-                                            href="{{ route('appointments.index', ['month' => $entry->preferred_date->format('Y-m'), 'date' => $entry->preferred_date->toDateString()]) }}"
+                                            href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/appointments', 'appointments.index', [], ['month' => $entry->preferred_date->format('Y-m'), 'date' => $entry->preferred_date->toDateString()]) }}"
                                             class="inline-flex rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
                                         >Calendar</a>
                                     @endif

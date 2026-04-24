@@ -13,6 +13,14 @@ class TreatmentPackageWebController extends Controller
 {
     public function index(): View
     {
+        return view('packages.index', $this->packagesIndexPayload());
+    }
+
+    /**
+     * @return array{packages: \Illuminate\Database\Eloquent\Collection<int, TreatmentPackage>, services: \Illuminate\Database\Eloquent\Collection<int, Service>}
+     */
+    protected function packagesIndexPayload(): array
+    {
         $packages = TreatmentPackage::query()
             ->with(['services' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')
@@ -20,10 +28,10 @@ class TreatmentPackageWebController extends Controller
 
         $services = Service::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'price']);
 
-        return view('packages.index', [
+        return [
             'packages' => $packages,
             'services' => $services,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

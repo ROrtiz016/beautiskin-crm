@@ -45,7 +45,7 @@
     <header class="sticky top-0 z-40 border-b border-slate-300/90 bg-white/95 shadow-sm shadow-slate-900/5 backdrop-blur-md">
         <div class="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2 sm:px-5 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:py-2.5">
             <div class="flex items-center gap-2">
-                <a href="{{ route('home') }}" class="text-base font-bold tracking-tight text-slate-900 hover:text-pink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600">
+                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/', 'home') }}" class="text-base font-bold tracking-tight text-slate-900 hover:text-pink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600">
                     BeautiSkin CRM
                 </a>
                 <span class="hidden h-4 w-px bg-slate-300 sm:block" aria-hidden="true"></span>
@@ -56,19 +56,19 @@
                     <div class="flex flex-wrap items-center gap-1">
                         <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline">Daily</span>
                         <div class="flex flex-wrap items-center gap-1 ml-4">
-                            <a href="{{ route('customers.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('customers.*') }}">Customers</a>
-                            <a href="{{ route('tasks.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('tasks.*') }}">Tasks</a>
-                            <a href="{{ route('activity.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('activity.index') }}">Activity</a>
-                            <a href="{{ route('appointments.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('appointments.*') }}">Appointments</a>
-                            <a href="{{ route('leads.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('leads.*') }}">Leads</a>
-                            <a href="{{ route('sales.pipeline.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.pipeline.*', 'sales.opportunities.*') }}">Pipeline</a>
-                            <a href="{{ route('services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
-                            <a href="{{ route('inventory.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('inventory.*') }}">Inventory</a>
-                            <a href="{{ route('packages.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('packages.*') }}">Packages</a>
-                            <a href="{{ route('quotes.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('quotes.*', 'quote-lines.*') }}">Quotes</a>
-                            <a href="{{ route('memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/customers', 'customers.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('customers.*') }}">Customers</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/tasks', 'tasks.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('tasks.*') }}">Tasks</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/activity', 'activity.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('activity.index') }}">Activity</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/appointments', 'appointments.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('appointments.*') }}">Appointments</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/leads', 'leads.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('leads.*') }}">Leads</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/sales/pipeline', 'sales.pipeline.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.pipeline.*', 'sales.opportunities.*') }}">Pipeline</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/services', 'services.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('services.*') }}">Services</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/inventory', 'inventory.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('inventory.*') }}">Inventory</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/packages', 'packages.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('packages.*') }}">Packages</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/quotes', 'quotes.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('quotes.*', 'quote-lines.*') }}">Quotes</a>
+                            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/memberships', 'memberships.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('memberships.*') }}">Memberships</a>
                             @can('view-sales')
-                                <a href="{{ route('sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
+                                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/sales', 'sales.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('sales.*') }}">Sales</a>
                             @endcan
                         </div>
                     
@@ -77,9 +77,9 @@
                         <div class="flex flex-wrap items-center gap-1 border-t border-slate-200 pt-2 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
                             <span class="mr-0.5 hidden text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:inline ml-4">Admin</span>
                             <div class="flex flex-wrap items-center gap-1 ml-4">
-                                <a href="{{ route('admin.operations.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.operations.*') }}">Operations</a>
-                                <a href="{{ route('admin.reports.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.reports.*') }}">Reports</a>
-                                <a href="{{ route('admin.control-board') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.control-board') }}">Control board</a>
+                                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/operations', 'admin.operations.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.operations.*') }}">Operations</a>
+                                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/reports', 'admin.reports.index') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.reports.*') }}">Reports</a>
+                                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/control-board', 'admin.control-board') }}" class="rounded-md px-2 py-1.5 {{ $navActive('admin.control-board') }}">Control board</a>
                             </div>
                         </div>
                     @endcan

@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\ClinicSetting;
 use App\Models\User;
 use App\Observers\AppointmentObserver;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -25,6 +26,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ResetPassword::createUrlUsing(function (User $user, string $token): string {
+            $base = (string) (config('app.frontend_url') ?: config('app.url'));
+
+            return rtrim($base, '/').'/reset-password/'.$token.'?email='.rawurlencode($user->email);
+        });
+
         Appointment::observe(AppointmentObserver::class);
 
         Gate::define('access-admin-board', function (User $user): bool {

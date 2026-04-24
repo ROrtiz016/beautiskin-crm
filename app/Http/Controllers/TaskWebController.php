@@ -23,6 +23,14 @@ class TaskWebController extends Controller
 
     public function index(Request $request): View
     {
+        return view('tasks.index', $this->tasksIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function tasksIndexPayload(Request $request): array
+    {
         $view = (string) $request->query('view', 'my_today');
         if (! in_array($view, self::VIEWS, true)) {
             $view = 'my_today';
@@ -71,7 +79,7 @@ class TaskWebController extends Controller
 
         $filterCustomer = $customerId > 0 ? Customer::query()->find($customerId) : null;
 
-        return view('tasks.index', [
+        return [
             'title' => 'Tasks · BeautiSkin CRM',
             'tasks' => $tasks,
             'currentView' => $view,
@@ -93,7 +101,7 @@ class TaskWebController extends Controller
             'filterCustomer' => $filterCustomer,
             'clinicTimezone' => $clinicTz,
             'kindLabels' => Task::kindLabels(),
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

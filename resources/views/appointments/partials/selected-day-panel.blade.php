@@ -112,7 +112,15 @@
                     data-visit-total="{{ number_format($visitTotal, 2, '.', '') }}"
                     data-payments-applied="{{ number_format($paymentsApplied, 2, '.', '') }}"
                     data-balance-due="{{ number_format($balanceDue, 2, '.', '') }}"
-                    data-payment-entries='@json($appointment->paymentEntries->map(fn ($e) => ['id' => $e->id, 'amount' => (float) $e->amount, 'entry_type' => $e->entry_type, 'note' => $e->note, 'created_at' => $e->created_at?->toIso8601String()])->values())'
+                    data-payment-entries='@json($appointment->paymentEntries->map(function ($e) {
+                        return [
+                            "id" => $e->id,
+                            "amount" => (float) $e->amount,
+                            "entry_type" => $e->entry_type,
+                            "note" => $e->note,
+                            "created_at" => $e->created_at ? $e->created_at->toIso8601String() : null,
+                        ];
+                    })->values())'
                     data-payment-entry-store="{{ route('appointments.payment-entries.store', $appointment) }}"
                     @if ($cancellationAttr !== '')
                         data-cancellation="{{ $cancellationAttr }}"

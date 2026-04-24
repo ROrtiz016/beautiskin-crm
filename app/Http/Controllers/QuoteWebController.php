@@ -18,6 +18,14 @@ class QuoteWebController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('quotes.index', $this->quotesIndexPayload($request));
+    }
+
+    /**
+     * @return array{quotes: \Illuminate\Contracts\Pagination\LengthAwarePaginator, customers: \Illuminate\Database\Eloquent\Collection<int, Customer>, search: string, customerId: int}
+     */
+    protected function quotesIndexPayload(Request $request): array
+    {
         $search = trim((string) $request->query('search', ''));
         $customerId = (int) $request->query('customer_id', 0);
 
@@ -39,12 +47,12 @@ class QuoteWebController extends Controller
 
         $customers = Customer::query()->orderBy('first_name')->orderBy('last_name')->limit(500)->get(['id', 'first_name', 'last_name']);
 
-        return view('quotes.index', [
+        return [
             'quotes' => $quotes,
             'customers' => $customers,
             'search' => $search,
             'customerId' => $customerId,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse
@@ -71,6 +79,14 @@ class QuoteWebController extends Controller
 
     public function show(Quote $quote): View
     {
+        return view('quotes.show', $this->quoteShowPayload($quote));
+    }
+
+    /**
+     * @return array{quote: Quote, services: \Illuminate\Database\Eloquent\Collection<int, Service>, packages: \Illuminate\Database\Eloquent\Collection<int, TreatmentPackage>, linkableAppointments: \Illuminate\Database\Eloquent\Collection<int, Appointment>}
+     */
+    protected function quoteShowPayload(Quote $quote): array
+    {
         $quote->load(['lines.service', 'lines.treatmentPackage', 'customer:id,first_name,last_name,email,phone']);
 
         $services = Service::query()->where('is_active', true)->orderBy('name')->get();
@@ -83,12 +99,12 @@ class QuoteWebController extends Controller
             ->limit(40)
             ->get(['id', 'scheduled_at', 'status', 'total_amount', 'quote_id']);
 
-        return view('quotes.show', [
+        return [
             'quote' => $quote,
             'services' => $services,
             'packages' => $packages,
             'linkableAppointments' => $linkableAppointments,
-        ]);
+        ];
     }
 
     public function update(Request $request, Quote $quote): RedirectResponse

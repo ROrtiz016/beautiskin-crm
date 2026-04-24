@@ -12,7 +12,7 @@
             </p>
         </div>
         @unless ($leadFunnelHideNav ?? false)
-            <a href="{{ route('leads.index') }}" class="shrink-0 text-sm font-semibold text-pink-700 hover:text-pink-800">Open leads →</a>
+            <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/leads', 'leads.index') }}" class="shrink-0 text-sm font-semibold text-pink-700 hover:text-pink-800">Open leads →</a>
         @endunless
     </div>
 

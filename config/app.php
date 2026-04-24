@@ -56,6 +56,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | SPA / Next.js staff UI URL (`FRONTEND_URL`)
+    |--------------------------------------------------------------------------
+    |
+    | This is the **single switch** for “staff use Next vs Blade HTML”:
+    |
+    | - **Unset / empty:** Laravel serves Blade on `APP_URL` for staff GETs (classic monolith).
+    | - **Set (absolute URL, browser-reachable):** browser GET/HEAD on web routes redirect to the
+    |   same path on the SPA; password reset links target this origin; see
+    |   {@see \App\Http\Middleware\RedirectWebUiToFrontend} and {@see \App\Support\FrontendAppUrl}.
+    |
+    | Production deployments that want the Next shell should **always** set this in `.env`.
+    | `docker compose` in this repo sets it for the `app` service by default (see `docker-compose.yml`).
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

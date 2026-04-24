@@ -8,6 +8,7 @@ use App\Models\ClinicSetting;
 use App\Models\User;
 use App\Models\WaitlistEntry;
 use App\Services\AppointmentPolicyEnforcer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -16,6 +17,14 @@ use Illuminate\View\View;
 class OperationsDashboardController extends Controller
 {
     public function index(Request $request): View
+    {
+        return view('admin.operations-dashboard', $this->operationsIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function operationsIndexPayload(Request $request): array
     {
         $clinic = ClinicSetting::current();
         $tz = AppointmentPolicyEnforcer::clinicTimezone();
@@ -77,7 +86,7 @@ class OperationsDashboardController extends Controller
             ];
         })->values()->all();
 
-        return view('admin.operations-dashboard', [
+        return [
             'clinicSettings' => $clinic,
             'metricsTimezone' => $tz,
             'metricsDateLabel' => now($tz)->format('l, M j, Y'),
@@ -86,10 +95,10 @@ class OperationsDashboardController extends Controller
             'waitlistDepth' => $waitlistDepth,
             'staffUtilizationRows' => $staffUtilizationRows,
             'operationsPanelOrder' => $request->user()->dashboardPanelOrder('operations'),
-        ]);
+        ];
     }
 
-    public function updateAppointmentPolicy(Request $request): RedirectResponse
+    public function updateAppointmentPolicy(Request $request): RedirectResponse|JsonResponse
     {
         if ($request->input('max_bookings_per_day') === '' || $request->input('max_bookings_per_day') === null) {
             $request->merge(['max_bookings_per_day' => null]);
@@ -135,12 +144,16 @@ class OperationsDashboardController extends Controller
             ],
         );
 
-        return redirect()
-            ->route('admin.operations.index')
-            ->with('status', 'Appointment policy saved.');
+        return $this->respondAdminAction(
+            $request,
+            'Appointment policy saved.',
+            'admin.operations.index',
+            [],
+            ['clinicSettings' => ClinicSetting::current()],
+        );
     }
 
-    public function updateFeatureFlags(Request $request): RedirectResponse
+    public function updateFeatureFlags(Request $request): RedirectResponse|JsonResponse
     {
         Gate::authorize('manage-feature-flags');
 
@@ -165,8 +178,12 @@ class OperationsDashboardController extends Controller
             ['feature_flags' => $clinic->feature_flags],
         );
 
-        return redirect()
-            ->route('admin.operations.index')
-            ->with('status', 'Feature flags saved.');
+        return $this->respondAdminAction(
+            $request,
+            'Feature flags saved.',
+            'admin.operations.index',
+            [],
+            ['clinicSettings' => ClinicSetting::current()],
+        );
     }
 }

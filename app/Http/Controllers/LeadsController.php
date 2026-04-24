@@ -20,6 +20,14 @@ class LeadsController extends Controller
 
     public function index(Request $request): View
     {
+        return view('leads.index', $this->leadsIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function leadsIndexPayload(Request $request): array
+    {
         $filters = $this->parseLeadListFilters($request);
 
         $listQuery = WaitlistEntry::query()
@@ -60,7 +68,7 @@ class LeadsController extends Controller
             || $filters['preferredTo'] !== '' || $filters['serviceId'] > 0 || $filters['assignedTo'] !== ''
             || $filters['createdFrom'] !== '';
 
-        return view('leads.index', array_merge(LeadFunnelMetrics::snapshot(), [
+        return array_merge(LeadFunnelMetrics::snapshot(), [
             'title' => 'Leads · BeautiSkin CRM',
             'entries' => $entries,
             'statusFilter' => $filters['status'],
@@ -77,7 +85,7 @@ class LeadsController extends Controller
             'hasActiveFilters' => $hasActiveFilters,
             'leadFunnelHideNav' => true,
             'leadSourceChart' => $leadSourceChart,
-        ]));
+        ]);
     }
 
     /**
@@ -91,7 +99,7 @@ class LeadsController extends Controller
      *     createdFrom: string
      * }
      */
-    private function parseLeadListFilters(Request $request): array
+    protected function parseLeadListFilters(Request $request): array
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
@@ -143,7 +151,7 @@ class LeadsController extends Controller
     /**
      * @param  array{search: string, status: string, preferredFrom: string, preferredTo: string, serviceId: int, assignedTo: string, createdFrom: string}  $f
      */
-    private function applyLeadListFilters(Builder $query, array $f): void
+    protected function applyLeadListFilters(Builder $query, array $f): void
     {
         if ($f['status'] !== '') {
             $query->where('status', $f['status']);
@@ -188,7 +196,7 @@ class LeadsController extends Controller
      * @param  Collection<string, int|string>  $countsBySource
      * @return array{items: list<array{key: string, label: string, count: int, percent: float}>, total: int, hasData: bool}
      */
-    private function buildLeadSourceChart(Collection $countsBySource): array
+    protected function buildLeadSourceChart(Collection $countsBySource): array
     {
         $total = (int) $countsBySource->sum();
         if ($total === 0) {

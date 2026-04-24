@@ -22,22 +22,43 @@
             </p>
             <div class="mt-8 flex flex-wrap gap-3">
                 @auth
-                    <a href="{{ route('customers.index') }}" class="crm-btn-primary">Customers</a>
-                    <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">Appointments</a>
-                    <a href="{{ route('leads.index') }}" class="crm-btn-secondary">Leads</a>
-                    <a href="{{ route('services.index') }}" class="crm-btn-secondary">Services</a>
-                    <a href="{{ route('memberships.index') }}" class="crm-btn-secondary">Memberships</a>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/customers', 'customers.index') }}" class="crm-btn-primary">Customers</a>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/appointments', 'appointments.index') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">Appointments</a>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/leads', 'leads.index') }}" class="crm-btn-secondary">Leads</a>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/services', 'services.index') }}" class="crm-btn-secondary">Services</a>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/memberships', 'memberships.index') }}" class="crm-btn-secondary">Memberships</a>
                     @can('view-sales')
-                        <a href="{{ route('sales.index') }}" class="crm-btn-secondary">Sales</a>
+                        <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/sales', 'sales.index') }}" class="crm-btn-secondary">Sales</a>
                     @endcan
                     @can('access-admin-board')
-                        <a href="{{ route('admin.control-board') }}" class="crm-btn-secondary">Admin board</a>
+                        <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/control-board', 'admin.control-board') }}" class="crm-btn-secondary">Admin board</a>
                     @endcan
                 @else
                     <a href="{{ route('login') }}" class="crm-btn-primary">Sign in</a>
                     <a href="{{ route('register') }}" class="crm-btn-secondary">Register</a>
                 @endauth
             </div>
+            @auth
+                <p class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/tasks', 'tasks.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Tasks</a>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/activity', 'activity.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Activity</a>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/sales/pipeline', 'sales.pipeline.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Pipeline</a>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/quotes', 'quotes.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Quotes</a>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/inventory', 'inventory.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Inventory</a>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/packages', 'packages.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Packages</a>
+                    @can('access-admin-board')
+                        <span class="text-slate-300" aria-hidden="true">·</span>
+                        <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/operations', 'admin.operations.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Operations</a>
+                        <span class="text-slate-300" aria-hidden="true">·</span>
+                        <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/admin/reports', 'admin.reports.index') }}" class="font-medium text-pink-700 hover:text-pink-800">Reports</a>
+                    @endcan
+                </p>
+            @endauth
         </header>
 
         @auth
@@ -77,12 +98,12 @@
             <article class="crm-panel p-5">
                 <h2 class="text-lg font-semibold text-slate-900">Services</h2>
                 <p class="mt-2 text-sm leading-relaxed text-slate-600">Manage treatment catalog, durations, pricing, and staff eligibility.</p>
-                <a href="{{ route('services.index') }}" class="mt-4 inline-flex text-sm font-semibold text-pink-700 hover:text-pink-800">Open services →</a>
+                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/services', 'services.index') }}" class="mt-4 inline-flex text-sm font-semibold text-pink-700 hover:text-pink-800">Open services →</a>
             </article>
             <article class="crm-panel p-5">
                 <h2 class="text-lg font-semibold text-slate-900">Memberships</h2>
                 <p class="mt-2 text-sm leading-relaxed text-slate-600">Track active plans and customer subscriptions.</p>
-                <a href="{{ route('memberships.index') }}" class="mt-4 inline-flex text-sm font-semibold text-pink-700 hover:text-pink-800">Open memberships →</a>
+                <a href="{{ \App\Support\FrontendAppUrl::toSpaOrRoute('/memberships', 'memberships.index') }}" class="mt-4 inline-flex text-sm font-semibold text-pink-700 hover:text-pink-800">Open memberships →</a>
             </article>
         </section>
     </div>

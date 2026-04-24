@@ -14,6 +14,14 @@ class ServiceWebController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('services.index', $this->servicesIndexPayload($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function servicesIndexPayload(Request $request): array
+    {
         $search = trim((string) $request->query('search', ''));
 
         $services = Service::query()
@@ -33,13 +41,13 @@ class ServiceWebController extends Controller
             ->limit(12)
             ->get();
 
-        return view('services.index', [
+        return [
             'services' => $services,
             'staffUsers' => $staffUsers,
             'memberships' => $memberships,
             'search' => $search,
             'lowStockServices' => $lowStockServices,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

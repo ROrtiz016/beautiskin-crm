@@ -10,6 +10,14 @@ class InventoryWebController extends Controller
 {
     public function index(Request $request): View
     {
+        return view('inventory.index', $this->inventoryIndexPayload($request));
+    }
+
+    /**
+     * @return array{items: \Illuminate\Database\Eloquent\Collection<int, Service>, lowStockItems: \Illuminate\Database\Eloquent\Collection<int, Service>, search: string}
+     */
+    protected function inventoryIndexPayload(Request $request): array
+    {
         $search = trim((string) $request->query('search', ''));
 
         $lowStockItems = Service::query()
@@ -33,10 +41,10 @@ class InventoryWebController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('inventory.index', [
+        return [
             'items' => $items,
             'lowStockItems' => $lowStockItems,
             'search' => $search,
-        ]);
+        ];
     }
 }
